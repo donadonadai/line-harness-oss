@@ -12,6 +12,8 @@ CREATE TABLE IF NOT EXISTS friends (
   status_message   TEXT,
   is_following     INTEGER NOT NULL DEFAULT 1,
   user_id          TEXT,
+  line_account_id  TEXT,
+  metadata         TEXT,
   score            INTEGER NOT NULL DEFAULT 0,
   created_at       TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%f', 'now', '+9 hours')),
   updated_at       TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%f', 'now', '+9 hours'))
@@ -121,6 +123,7 @@ CREATE TABLE IF NOT EXISTS messages_log (
   content          TEXT NOT NULL,
   broadcast_id     TEXT REFERENCES broadcasts (id) ON DELETE SET NULL,
   scenario_step_id TEXT REFERENCES scenario_steps (id) ON DELETE SET NULL,
+  delivery_type    TEXT,
   created_at       TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%f', 'now', '+9 hours'))
 );
 
