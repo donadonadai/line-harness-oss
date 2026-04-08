@@ -6,7 +6,7 @@ import { useAccount } from '@/contexts/account-context'
 import Header from '@/components/layout/header'
 import CcPromptButton from '@/components/cc-prompt-button'
 
-type AutomationEventType = "friend_add" | "tag_change" | "score_threshold" | "cv_fire" | "message_received" | "calendar_booked"
+type AutomationEventType = "friend_add" | "tag_change" | "score_threshold" | "cv_fire" | "message_received" | "calendar_booked" | "queue_checkin"
 
 interface AutomationAction {
   type: "add_tag" | "remove_tag" | "start_scenario" | "send_message" | "send_webhook" | "switch_rich_menu"
@@ -33,6 +33,7 @@ const eventTypeOptions: { value: AutomationEventType; label: string }[] = [
   { value: 'cv_fire', label: 'CV発火' },
   { value: 'message_received', label: 'メッセージ受信' },
   { value: 'calendar_booked', label: 'カレンダー予約' },
+  { value: 'queue_checkin', label: '来局受付' },
 ]
 
 const eventTypeLabelMap: Record<AutomationEventType, string> = {
@@ -42,6 +43,7 @@ const eventTypeLabelMap: Record<AutomationEventType, string> = {
   cv_fire: 'CV発火',
   message_received: 'メッセージ受信',
   calendar_booked: 'カレンダー予約',
+  queue_checkin: '来局受付',
 }
 
 const eventTypeBadgeColor: Record<AutomationEventType, string> = {
@@ -51,6 +53,7 @@ const eventTypeBadgeColor: Record<AutomationEventType, string> = {
   cv_fire: 'bg-red-100 text-red-700',
   message_received: 'bg-purple-100 text-purple-700',
   calendar_booked: 'bg-indigo-100 text-indigo-700',
+  queue_checkin: 'bg-teal-100 text-teal-700',
 }
 
 interface CreateFormState {

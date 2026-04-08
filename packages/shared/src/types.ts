@@ -620,7 +620,8 @@ export type AutomationEventType =
   | "score_threshold"
   | "cv_fire"
   | "message_received"
-  | "calendar_booked";
+  | "calendar_booked"
+  | "queue_checkin";
 
 export interface AutomationAction {
   type: "add_tag" | "remove_tag" | "start_scenario" | "send_message" | "send_webhook" | "switch_rich_menu";
@@ -648,6 +649,36 @@ export interface AutomationLog {
   actionsResult: string | null;
   status: "success" | "partial" | "failed";
   createdAt: string;
+}
+
+// -----------------------------------------------------------------------------
+// 受付番号 (Queue)
+// -----------------------------------------------------------------------------
+
+export type QueueEntryStatus = "waiting" | "ready" | "done" | "cancelled";
+
+export interface QueueSettings {
+  id: string;
+  lineAccountId: string;
+  isActive: boolean;
+  notifyTemplate: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface QueueEntry {
+  id: string;
+  lineAccountId: string;
+  friendId: string | null;
+  queueNumber: number;
+  queueDate: string;
+  status: QueueEntryStatus;
+  calledAt: string | null;
+  createdAt: string;
+  updatedAt: string;
+  /** JOIN時のみ */
+  displayName?: string | null;
+  lineUserId?: string | null;
 }
 
 // =============================================================================

@@ -410,6 +410,58 @@
     .close-btn:active {
       background: #e8faf0;
     }
+
+    /* ========== Queue Page ========== */
+    .queue-icon {
+      font-size: 48px;
+      margin-bottom: 8px;
+    }
+    .queue-checkin-btn {
+      display: block;
+      width: 100%;
+      margin-top: 20px;
+      padding: 16px;
+      border: none;
+      border-radius: 8px;
+      background: #06C755;
+      color: #fff;
+      font-size: 18px;
+      font-weight: 700;
+      cursor: pointer;
+      transition: opacity 0.15s;
+      font-family: inherit;
+    }
+    .queue-checkin-btn:active {
+      opacity: 0.85;
+    }
+    .queue-checkin-btn:disabled {
+      background: #bbb;
+      cursor: not-allowed;
+    }
+    .queue-number-display {
+      margin: 8px 0 16px;
+      animation: fadeIn 0.5s ease;
+    }
+    .queue-number-circle {
+      width: 120px;
+      height: 120px;
+      border-radius: 50%;
+      background: #06C755;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      margin: 0 auto 12px;
+    }
+    .queue-number-value {
+      font-size: 48px;
+      font-weight: 800;
+      color: #fff;
+    }
+    .queue-number-label {
+      font-size: 16px;
+      font-weight: 700;
+      color: #06C755;
+    }
   </style>
 </head>
 <body>

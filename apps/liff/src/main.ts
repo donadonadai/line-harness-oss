@@ -16,6 +16,7 @@
 
 import { initBooking } from './booking.js';
 import { initForm } from './form.js';
+import { initQueue } from './queue.js';
 
 declare const liff: {
   init(config: { liffId: string }): Promise<void>;
@@ -261,6 +262,9 @@ async function main() {
       const params = new URLSearchParams(window.location.search);
       const formId = params.get('id');
       await initForm(formId);
+    } else if (page === 'queue') {
+      const params = new URLSearchParams(window.location.search);
+      await initQueue(params.get('account'));
     } else {
       await linkAndAddFlow();
     }

@@ -22,6 +22,8 @@ import type {
   Notification,
   AccountHealthLog,
   AccountMigration,
+  QueueSettings,
+  QueueEntry,
 } from '@line-crm/shared'
 
 import type { Broadcast } from '@line-crm/shared'
@@ -479,5 +481,21 @@ export const api = {
       }),
     getMigration: (migrationId: string) =>
       fetchApi<ApiResponse<AccountMigration>>(`/api/accounts/migrations/${migrationId}`),
+  },
+  queue: {
+    getSettings: (accountId: string) =>
+      fetchApi<ApiResponse<QueueSettings | null>>(`/api/queue/settings?lineAccountId=${accountId}`),
+    updateSettings: (data: { lineAccountId: string; isActive?: boolean; notifyTemplate?: string }) =>
+      fetchApi<ApiResponse<QueueSettings>>('/api/queue/settings', {
+        method: 'PUT',
+        body: JSON.stringify(data),
+      }),
+    entries: (accountId: string) =>
+      fetchApi<ApiResponse<QueueEntry[]>>(`/api/queue/entries?lineAccountId=${accountId}`),
+    updateEntryStatus: (id: string, status: string) =>
+      fetchApi<ApiResponse<null>>(`/api/queue/entries/${id}/status`, {
+        method: 'PUT',
+        body: JSON.stringify({ status }),
+      }),
   },
 }

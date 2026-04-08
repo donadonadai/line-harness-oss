@@ -504,3 +504,34 @@ CREATE TABLE IF NOT EXISTS automation_logs (
 );
 
 CREATE INDEX IF NOT EXISTS idx_automation_logs_automation ON automation_logs (automation_id);
+
+-- ─────────────────────────────────────────────────────────────
+-- Round 4: 受付番号 (Pharmacy Queue)
+-- ─────────────────────────────────────────────────────────────
+
+CREATE TABLE IF NOT EXISTS queue_settings (
+  id               TEXT PRIMARY KEY,
+  line_account_id  TEXT NOT NULL,
+  is_active        INTEGER NOT NULL DEFAULT 1,
+  notify_template  TEXT NOT NULL DEFAULT '受付番号{{queue_number}}番の{{name}}様、お薬の準備ができました。窓口までお越しください。',
+  created_at       TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%f', 'now', '+9 hours')),
+  updated_at       TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%f', 'now', '+9 hours'))
+);
+
+CREATE INDEX IF NOT EXISTS idx_queue_settings_account ON queue_settings (line_account_id);
+
+CREATE TABLE IF NOT EXISTS queue_entries (
+  id               TEXT PRIMARY KEY,
+  line_account_id  TEXT NOT NULL,
+  friend_id        TEXT REFERENCES friends (id) ON DELETE SET NULL,
+  queue_number     INTEGER NOT NULL,
+  queue_date       TEXT NOT NULL,
+  status           TEXT NOT NULL DEFAULT 'waiting' CHECK (status IN ('waiting', 'ready', 'done', 'cancelled')),
+  called_at        TEXT,
+  created_at       TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%f', 'now', '+9 hours')),
+  updated_at       TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%f', 'now', '+9 hours'))
+);
+
+CREATE INDEX IF NOT EXISTS idx_queue_entries_account_date ON queue_entries (line_account_id, queue_date);
+CREATE UNIQUE INDEX IF NOT EXISTS idx_queue_entries_unique_number ON queue_entries (line_account_id, queue_date, queue_number);
+CREATE INDEX IF NOT EXISTS idx_queue_entries_friend ON queue_entries (friend_id);
