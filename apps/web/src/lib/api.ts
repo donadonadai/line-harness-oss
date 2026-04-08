@@ -24,6 +24,10 @@ import type {
   AccountMigration,
   QueueSettings,
   QueueEntry,
+  RichMenu,
+  RichMenuAreaConfig,
+  RichMenuLayoutType,
+  RichMenuTabGroup,
 } from '@line-crm/shared'
 
 import type { Broadcast } from '@line-crm/shared'
@@ -481,6 +485,63 @@ export const api = {
       }),
     getMigration: (migrationId: string) =>
       fetchApi<ApiResponse<AccountMigration>>(`/api/accounts/migrations/${migrationId}`),
+  },
+  richMenus: {
+    managed: {
+      list: (params?: { accountId?: string }) => {
+        const query = params?.accountId ? '?lineAccountId=' + params.accountId : ''
+        return fetchApi<ApiResponse<RichMenu[]>>('/api/rich-menus/managed' + query)
+      },
+      get: (id: string) =>
+        fetchApi<ApiResponse<RichMenu & { postbackActions?: unknown[] }>>(`/api/rich-menus/managed/${id}`),
+      create: (data: {
+        name: string
+        layoutType: RichMenuLayoutType
+        sizeType?: 'large' | 'small'
+        chatBarText?: string
+        areasConfig: RichMenuAreaConfig[]
+        lineAccountId?: string
+      }) =>
+        fetchApi<ApiResponse<RichMenu>>('/api/rich-menus/managed', {
+          method: 'POST',
+          body: JSON.stringify(data),
+        }),
+      update: (id: string, data: {
+        name?: string
+        chatBarText?: string
+        layoutType?: RichMenuLayoutType
+        areasConfig?: RichMenuAreaConfig[]
+        isActive?: boolean
+      }) =>
+        fetchApi<ApiResponse<RichMenu>>(`/api/rich-menus/managed/${id}`, {
+          method: 'PUT',
+          body: JSON.stringify(data),
+        }),
+      delete: (id: string) =>
+        fetchApi<ApiResponse<null>>(`/api/rich-menus/managed/${id}`, { method: 'DELETE' }),
+      uploadImage: (id: string, base64Image: string, contentType?: string) =>
+        fetchApi<ApiResponse<null>>(`/api/rich-menus/managed/${id}/image`, {
+          method: 'POST',
+          body: JSON.stringify({ image: base64Image, contentType }),
+        }),
+      activate: (id: string) =>
+        fetchApi<ApiResponse<RichMenu>>(`/api/rich-menus/managed/${id}/activate`, { method: 'POST' }),
+    },
+    layouts: () =>
+      fetchApi<ApiResponse<Record<string, unknown>>>('/api/rich-menus/layouts'),
+    tabGroups: {
+      list: (params?: { accountId?: string }) => {
+        const query = params?.accountId ? '?lineAccountId=' + params.accountId : ''
+        return fetchApi<ApiResponse<RichMenuTabGroup[]>>('/api/rich-menu-tab-groups' + query)
+      },
+      create: (data: { name: string; tabCount?: number; lineAccountId?: string }) =>
+        fetchApi<ApiResponse<RichMenuTabGroup>>('/api/rich-menu-tab-groups', {
+          method: 'POST',
+          body: JSON.stringify(data),
+        }),
+      delete: (id: string) =>
+        fetchApi<ApiResponse<null>>(`/api/rich-menu-tab-groups/${id}`, { method: 'DELETE' }),
+    },
   },
   queue: {
     getSettings: (accountId: string) =>

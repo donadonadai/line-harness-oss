@@ -538,3 +538,65 @@ CREATE TABLE IF NOT EXISTS queue_entries (
 CREATE INDEX IF NOT EXISTS idx_queue_entries_account_date ON queue_entries (line_account_id, queue_date);
 CREATE UNIQUE INDEX IF NOT EXISTS idx_queue_entries_unique_number ON queue_entries (line_account_id, queue_date, queue_number);
 CREATE INDEX IF NOT EXISTS idx_queue_entries_friend ON queue_entries (friend_id);
+
+-- ─────────────────────────────────────────────────────────────
+-- Round 5: リッチメニュー管理 (Rich Menu Management)
+-- ─────────────────────────────────────────────────────────────
+
+-- リッチメニューローカルメタデータ
+CREATE TABLE IF NOT EXISTS rich_menus (
+  id                TEXT PRIMARY KEY,
+  line_rich_menu_id TEXT NOT NULL,
+  line_alias_id     TEXT,
+  name              TEXT NOT NULL,
+  size_type         TEXT NOT NULL CHECK (size_type IN ('large', 'small')) DEFAULT 'large',
+  layout_type       TEXT NOT NULL,
+  chat_bar_text     TEXT NOT NULL DEFAULT 'メニュー',
+  is_default        INTEGER NOT NULL DEFAULT 0,
+  tab_group_id      TEXT,
+  tab_order         INTEGER,
+  tab_label         TEXT,
+  image_url         TEXT,
+  areas_config      TEXT NOT NULL DEFAULT '[]',
+  line_account_id   TEXT,
+  is_active         INTEGER NOT NULL DEFAULT 1,
+  created_at        TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%f', 'now', '+9 hours')),
+  updated_at        TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%f', 'now', '+9 hours'))
+);
+CREATE INDEX IF NOT EXISTS idx_rich_menus_line_id ON rich_menus (line_rich_menu_id);
+CREATE INDEX IF NOT EXISTS idx_rich_menus_account ON rich_menus (line_account_id);
+
+-- ポストバックアクション定義（タップ時の複合アクション）
+CREATE TABLE IF NOT EXISTS rich_menu_postback_actions (
+  id              TEXT PRIMARY KEY,
+  rich_menu_id    TEXT NOT NULL REFERENCES rich_menus (id) ON DELETE CASCADE,
+  area_index      INTEGER NOT NULL,
+  postback_data   TEXT NOT NULL,
+  actions         TEXT NOT NULL DEFAULT '[]',
+  created_at      TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%f', 'now', '+9 hours'))
+);
+CREATE UNIQUE INDEX IF NOT EXISTS idx_rm_postback_data ON rich_menu_postback_actions (postback_data);
+
+-- タブグループ
+CREATE TABLE IF NOT EXISTS rich_menu_tab_groups (
+  id              TEXT PRIMARY KEY,
+  name            TEXT NOT NULL,
+  tab_count       INTEGER NOT NULL DEFAULT 2,
+  line_account_id TEXT,
+  created_at      TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%f', 'now', '+9 hours')),
+  updated_at      TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%f', 'now', '+9 hours'))
+);
+
+-- セグメントルール
+CREATE TABLE IF NOT EXISTS rich_menu_segment_rules (
+  id              TEXT PRIMARY KEY,
+  name            TEXT NOT NULL,
+  rich_menu_id    TEXT NOT NULL REFERENCES rich_menus (id) ON DELETE CASCADE,
+  conditions      TEXT NOT NULL DEFAULT '{}',
+  priority        INTEGER NOT NULL DEFAULT 0,
+  line_account_id TEXT,
+  is_active       INTEGER NOT NULL DEFAULT 1,
+  created_at      TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%f', 'now', '+9 hours')),
+  updated_at      TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%f', 'now', '+9 hours'))
+);
+CREATE INDEX IF NOT EXISTS idx_rm_segment_active ON rich_menu_segment_rules (is_active, priority DESC);

@@ -140,6 +140,35 @@ export class LineClient {
     );
   }
 
+  // ─── Rich Menu Alias ─────────────────────────────────────────────────────
+
+  async createRichMenuAlias(richMenuId: string, aliasId: string): Promise<void> {
+    await this.request('/richmenu/alias', { richMenuAliasId: aliasId, richMenuId });
+  }
+
+  async updateRichMenuAlias(aliasId: string, richMenuId: string): Promise<void> {
+    await this.request(
+      `/richmenu/alias/${encodeURIComponent(aliasId)}`,
+      { richMenuId },
+    );
+  }
+
+  async deleteRichMenuAlias(aliasId: string): Promise<void> {
+    await this.request(
+      `/richmenu/alias/${encodeURIComponent(aliasId)}`,
+      {},
+      'DELETE',
+    );
+  }
+
+  async getRichMenuAliasList(): Promise<{ aliases: Array<{ richMenuAliasId: string; richMenuId: string }> }> {
+    return this.request<{ aliases: Array<{ richMenuAliasId: string; richMenuId: string }> }>(
+      '/richmenu/alias/list',
+      {},
+      'GET',
+    );
+  }
+
   // ─── Helpers ──────────────────────────────────────────────────────────────
 
   async pushTextMessage(to: string, text: string): Promise<void> {

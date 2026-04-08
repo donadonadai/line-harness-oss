@@ -12,6 +12,7 @@ import {
   completeFriendScenario,
   upsertChatOnMessage,
   getLineAccounts,
+  getPostbackActionByData,
   jstNow,
 } from '@line-crm/db';
 import { fireEvent } from '../services/event-bus.js';
@@ -184,6 +185,73 @@ async function handleEvent(
 
     await updateFriendFollowStatus(db, userId, false);
     return;
+  }
+
+  // ─── Postback Event (Rich Menu actions) ───────────────────────────────────
+  if (event.type === 'postback') {
+    const postbackData = event.postback.data;
+
+    // Handle rich menu postback actions (format: rm:{localId}:area:{index})
+    if (postbackData.startsWith('rm:')) {
+      const userId = event.source.type === 'user' ? event.source.userId : undefined;
+      if (!userId) return;
+
+      const friend = await getFriendByLineUserId(db, userId);
+      if (!friend) return;
+
+      try {
+        const pbAction = await getPostbackActionByData(db, postbackData);
+        if (pbAction) {
+          const actions = JSON.parse(pbAction.actions) as Array<{ type: string; params: Record<string, string> }>;
+          const { executeAction } = await import('../services/event-bus.js') as { executeAction?: (db: D1Database, action: { type: string; params: Record<string, string> }, payload: { friendId: string }, lineAccessToken?: string) => Promise<void> };
+
+          // Import and use fireEvent's executeAction indirectly via event bus
+          for (const action of actions) {
+            try {
+              // Execute each action
+              switch (action.type) {
+                case 'add_tag': {
+                  const { addTagToFriend } = await import('@line-crm/db');
+                  await addTagToFriend(db, friend.id, action.params.tagId);
+                  await fireEvent(db, 'tag_change', { friendId: friend.id, eventData: { tagId: action.params.tagId, action: 'add' } }, lineAccessToken, lineAccountId);
+                  break;
+                }
+                case 'remove_tag': {
+                  const { removeTagFromFriend } = await import('@line-crm/db');
+                  await removeTagFromFriend(db, friend.id, action.params.tagId);
+                  await fireEvent(db, 'tag_change', { friendId: friend.id, eventData: { tagId: action.params.tagId, action: 'remove' } }, lineAccessToken, lineAccountId);
+                  break;
+                }
+                case 'start_scenario': {
+                  const { enrollFriendInScenario: enroll } = await import('@line-crm/db');
+                  await enroll(db, friend.id, action.params.scenarioId);
+                  break;
+                }
+                case 'send_message': {
+                  await lineClient.pushMessage(userId, [{ type: 'text', text: action.params.content || '' }]);
+                  break;
+                }
+                case 'send_template': {
+                  const template = await db.prepare('SELECT * FROM templates WHERE id = ?').bind(action.params.templateId).first<{ message_type: string; message_content: string }>();
+                  if (template) {
+                    const msg = buildMessage(template.message_type, template.message_content);
+                    await lineClient.pushMessage(userId, [msg]);
+                  }
+                  break;
+                }
+                default:
+                  console.warn(`Unknown postback action type: ${action.type}`);
+              }
+            } catch (actionErr) {
+              console.error(`Postback action error (${action.type}):`, actionErr);
+            }
+          }
+        }
+      } catch (err) {
+        console.error('Rich menu postback handler error:', err);
+      }
+      return;
+    }
   }
 
   if (event.type === 'message' && event.message.type === 'text') {

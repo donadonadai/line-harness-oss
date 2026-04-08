@@ -681,6 +681,115 @@ export interface QueueEntry {
   lineUserId?: string | null;
 }
 
+// -----------------------------------------------------------------------------
+// リッチメニュー管理 (Rich Menu Management)
+// -----------------------------------------------------------------------------
+
+/** リッチメニューサイズ種別 */
+export type RichMenuSizeType = 'large' | 'small';
+
+/** リッチメニューレイアウト種別 (12パターン) */
+export type RichMenuLayoutType =
+  | 'large_full'
+  | 'large_2h'
+  | 'large_2v'
+  | 'large_3col'
+  | 'large_1top_2bottom'
+  | 'large_2top_1bottom'
+  | 'large_2x2'
+  | 'large_2x3'
+  | 'small_full'
+  | 'small_2h'
+  | 'small_3col'
+  | 'small_2x2';
+
+/** エリアアクション種別 */
+export type RichMenuAreaActionType =
+  | 'url'
+  | 'user_message'
+  | 'keyword_reply'
+  | 'add_tag'
+  | 'remove_tag'
+  | 'open_form'
+  | 'send_template'
+  | 'switch_rich_menu'
+  | 'start_scenario'
+  | 'compound';
+
+/** リッチメニューエリア設定 (ローカル管理用) */
+export interface RichMenuAreaConfig {
+  /** アクション種別 */
+  actionType: RichMenuAreaActionType;
+  /** アクションラベル (UI表示用) */
+  label?: string;
+  /** URL (actionType: url) */
+  url?: string;
+  /** メッセージテキスト (actionType: user_message) */
+  text?: string;
+  /** タグID (actionType: add_tag / remove_tag) */
+  tagId?: string;
+  /** フォームID (actionType: open_form) */
+  formId?: string;
+  /** テンプレートID (actionType: send_template) */
+  templateId?: string;
+  /** リッチメニューID or aliasId (actionType: switch_rich_menu) */
+  richMenuAliasId?: string;
+  /** シナリオID (actionType: start_scenario) */
+  scenarioId?: string;
+  /** 複合アクション (actionType: compound) */
+  compoundActions?: RichMenuCompoundAction[];
+}
+
+/** 複合アクション (エルメアクション) */
+export interface RichMenuCompoundAction {
+  type: 'add_tag' | 'remove_tag' | 'start_scenario' | 'stop_scenario' | 'send_message' | 'send_template' | 'switch_rich_menu' | 'add_score' | 'set_reminder';
+  params: Record<string, unknown>;
+}
+
+/** リッチメニュー (ローカルDB) */
+export interface RichMenu {
+  id: string;
+  lineRichMenuId: string;
+  lineAliasId: string | null;
+  name: string;
+  sizeType: RichMenuSizeType;
+  layoutType: RichMenuLayoutType;
+  chatBarText: string;
+  isDefault: boolean;
+  tabGroupId: string | null;
+  tabOrder: number | null;
+  tabLabel: string | null;
+  imageUrl: string | null;
+  areasConfig: RichMenuAreaConfig[];
+  lineAccountId: string | null;
+  isActive: boolean;
+  createdAt: string;
+  updatedAt: string;
+}
+
+/** タブグループ */
+export interface RichMenuTabGroup {
+  id: string;
+  name: string;
+  tabCount: number;
+  lineAccountId: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+/** セグメントルール */
+export interface RichMenuSegmentRule {
+  id: string;
+  name: string;
+  richMenuId: string;
+  conditions: Record<string, unknown>;
+  priority: number;
+  lineAccountId: string | null;
+  isActive: boolean;
+  createdAt: string;
+  updatedAt: string;
+}
+
 // =============================================================================
 // API レスポンスラッパー型
 // =============================================================================
