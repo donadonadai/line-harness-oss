@@ -621,3 +621,31 @@ CREATE TABLE IF NOT EXISTS prescription_submissions (
   updated_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%f', 'now', '+9 hours'))
 );
 CREATE INDEX IF NOT EXISTS idx_prescription_account ON prescription_submissions (line_account_id, status);
+
+-- ─────────────────────────────────────────────────────────────
+-- Round 7: カスタムフィールド (Friend Custom Fields)
+-- ─────────────────────────────────────────────────────────────
+
+-- フィールド定義 (管理者が項目を定義)
+CREATE TABLE IF NOT EXISTS custom_field_definitions (
+  id              TEXT PRIMARY KEY,
+  field_key       TEXT NOT NULL,
+  name            TEXT NOT NULL,
+  field_type      TEXT NOT NULL DEFAULT 'text' CHECK (field_type IN ('text', 'number', 'date', 'select')),
+  options         TEXT,
+  sort_order      INTEGER NOT NULL DEFAULT 0,
+  line_account_id TEXT,
+  created_at      TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%f', 'now', '+9 hours'))
+);
+CREATE UNIQUE INDEX IF NOT EXISTS idx_cfd_key_account ON custom_field_definitions (field_key, line_account_id);
+
+-- 友だちごとのフィールド値
+CREATE TABLE IF NOT EXISTS friend_custom_fields (
+  id         TEXT PRIMARY KEY,
+  friend_id  TEXT NOT NULL,
+  field_key  TEXT NOT NULL,
+  value      TEXT NOT NULL DEFAULT '',
+  updated_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%f', 'now', '+9 hours'))
+);
+CREATE UNIQUE INDEX IF NOT EXISTS idx_fcf_friend_key ON friend_custom_fields (friend_id, field_key);
+CREATE INDEX IF NOT EXISTS idx_fcf_friend ON friend_custom_fields (friend_id);

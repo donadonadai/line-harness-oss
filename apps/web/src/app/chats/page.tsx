@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useCallback } from 'react'
 import { api, fetchApi } from '@/lib/api'
+import type { PrescriptionSubmission, FriendInfo, CustomFieldDefinition } from '@/lib/api'
 import { useAccount } from '@/contexts/account-context'
 import Header from '@/components/layout/header'
 import CcPromptButton from '@/components/cc-prompt-button'
@@ -227,6 +228,369 @@ function DirectMessagePanel({ friendId, friend, onBack, onSent }: {
           </button>
         </div>
       </div>
+    </div>
+  )
+}
+
+// ─── Right Panel: Friend Info & Prescription History ───
+
+type RightPanelTab = 'info' | 'prescriptions'
+
+const prescriptionStatusConfig: Record<string, { label: string; color: string; bg: string }> = {
+  received: { label: '受付済み', color: '#d97706', bg: '#fef3c7' },
+  preparing: { label: '準備中', color: '#2563eb', bg: '#dbeafe' },
+  ready: { label: '準備完了', color: '#059669', bg: '#d1fae5' },
+  done: { label: '受渡完了', color: '#6b7280', bg: '#f3f4f6' },
+  cancelled: { label: 'キャンセル', color: '#dc2626', bg: '#fee2e2' },
+}
+
+function FriendRightPanel({
+  friendId,
+  friendName,
+  accountId,
+}: {
+  friendId: string
+  friendName: string
+  accountId: string
+}) {
+  const [tab, setTab] = useState<RightPanelTab>('info')
+  const [info, setInfo] = useState<FriendInfo | null>(null)
+  const [definitions, setDefinitions] = useState<CustomFieldDefinition[]>([])
+  const [prescriptions, setPrescriptions] = useState<PrescriptionSubmission[]>([])
+  const [loadingInfo, setLoadingInfo] = useState(true)
+  const [loadingRx, setLoadingRx] = useState(false)
+  const [editingField, setEditingField] = useState<string | null>(null)
+  const [editValue, setEditValue] = useState('')
+  const [savingField, setSavingField] = useState(false)
+  const [imageModal, setImageModal] = useState<string | null>(null)
+
+  // New field form
+  const [showAddField, setShowAddField] = useState(false)
+  const [newFieldName, setNewFieldName] = useState('')
+  const [newFieldKey, setNewFieldKey] = useState('')
+  const [addingField, setAddingField] = useState(false)
+
+  // Load friend info + definitions
+  useEffect(() => {
+    setLoadingInfo(true)
+    setInfo(null)
+    Promise.all([
+      api.customFields.getFriendInfo(friendId),
+      accountId ? api.customFields.definitions(accountId) : Promise.resolve({ success: true, data: [] }),
+    ])
+      .then(([infoRes, defsRes]) => {
+        if (infoRes.success) setInfo(infoRes.data)
+        if (defsRes.success) setDefinitions(defsRes.data as CustomFieldDefinition[])
+      })
+      .catch(() => {})
+      .finally(() => setLoadingInfo(false))
+  }, [friendId, accountId])
+
+  // Load prescriptions when tab switches
+  useEffect(() => {
+    if (tab !== 'prescriptions') return
+    setLoadingRx(true)
+    api.prescriptions.byFriend(friendId)
+      .then((res) => { if (res.success) setPrescriptions(res.data) })
+      .catch(() => {})
+      .finally(() => setLoadingRx(false))
+  }, [tab, friendId])
+
+  const handleSaveField = async (fieldKey: string) => {
+    setSavingField(true)
+    try {
+      await api.customFields.updateFriendFields(friendId, { [fieldKey]: editValue })
+      setInfo((prev) =>
+        prev ? { ...prev, customFields: { ...prev.customFields, [fieldKey]: editValue } } : prev,
+      )
+      setEditingField(null)
+    } catch {}
+    setSavingField(false)
+  }
+
+  const handleAddFieldDef = async () => {
+    if (!newFieldName.trim()) return
+    setAddingField(true)
+    const key = newFieldKey.trim() || newFieldName.trim().toLowerCase().replace(/[^a-z0-9_]/g, '_')
+    try {
+      const res = await api.customFields.createDefinition({
+        fieldKey: key,
+        name: newFieldName.trim(),
+        lineAccountId: accountId,
+        sortOrder: definitions.length,
+      })
+      if (res.success) {
+        setDefinitions((prev) => [...prev, res.data])
+        setNewFieldName('')
+        setNewFieldKey('')
+        setShowAddField(false)
+      }
+    } catch {}
+    setAddingField(false)
+  }
+
+  const handleDeleteFieldDef = async (id: string) => {
+    try {
+      await api.customFields.deleteDefinition(id)
+      setDefinitions((prev) => prev.filter((d) => d.id !== id))
+    } catch {}
+  }
+
+  const formatDate = (iso: string) =>
+    new Date(iso).toLocaleString('ja-JP', { year: 'numeric', month: '2-digit', day: '2-digit' })
+
+  return (
+    <div className="w-80 shrink-0 bg-white rounded-lg shadow-sm border border-gray-200 flex-col overflow-hidden hidden xl:flex">
+      {/* Tab header */}
+      <div className="flex border-b border-gray-200">
+        <button
+          onClick={() => setTab('info')}
+          className={`flex-1 px-3 py-2.5 text-xs font-medium transition-colors ${
+            tab === 'info' ? 'text-green-700 border-b-2 border-green-500 bg-green-50' : 'text-gray-500 hover:bg-gray-50'
+          }`}
+        >
+          <svg className="w-4 h-4 mx-auto mb-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+          </svg>
+          友だち情報
+        </button>
+        <button
+          onClick={() => setTab('prescriptions')}
+          className={`flex-1 px-3 py-2.5 text-xs font-medium transition-colors ${
+            tab === 'prescriptions' ? 'text-green-700 border-b-2 border-green-500 bg-green-50' : 'text-gray-500 hover:bg-gray-50'
+          }`}
+        >
+          <svg className="w-4 h-4 mx-auto mb-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+          </svg>
+          処方せん履歴
+        </button>
+      </div>
+
+      {/* Tab content */}
+      <div className="flex-1 overflow-y-auto">
+        {tab === 'info' ? (
+          <div className="p-4 space-y-4">
+            {loadingInfo ? (
+              <div className="space-y-3 animate-pulse">
+                {[...Array(4)].map((_, i) => (
+                  <div key={i}>
+                    <div className="h-2 bg-gray-200 rounded w-20 mb-1" />
+                    <div className="h-4 bg-gray-100 rounded w-32" />
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <>
+                {/* Auto-computed: Prescription stats */}
+                <div>
+                  <p className="text-[11px] font-semibold text-gray-400 uppercase tracking-wider mb-2">処方せん</p>
+                  <div className="space-y-2">
+                    <div className="flex justify-between items-center py-1.5 border-b border-gray-100">
+                      <span className="text-xs text-gray-500">送信最終利用日</span>
+                      <span className="text-sm font-medium text-gray-900">
+                        {info?.prescriptionStats.lastDate
+                          ? info.prescriptionStats.lastDate.replace(/-/g, '.')
+                          : '-'}
+                      </span>
+                    </div>
+                    <div className="flex justify-between items-center py-1.5 border-b border-gray-100">
+                      <span className="text-xs text-gray-500">送信回数</span>
+                      <span className="text-sm font-medium text-gray-900">
+                        {info?.prescriptionStats.count ?? 0}
+                      </span>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Custom fields */}
+                {definitions.length > 0 && (
+                  <div>
+                    <p className="text-[11px] font-semibold text-gray-400 uppercase tracking-wider mb-2">カスタム項目</p>
+                    <div className="space-y-2">
+                      {definitions.map((def) => {
+                        const value = info?.customFields[def.fieldKey] ?? ''
+                        const isEditing = editingField === def.fieldKey
+                        return (
+                          <div key={def.id} className="py-1.5 border-b border-gray-100">
+                            <div className="flex items-center justify-between mb-0.5">
+                              <span className="text-xs text-gray-500">{def.name}</span>
+                              <div className="flex items-center gap-1">
+                                {!isEditing && (
+                                  <button
+                                    onClick={() => { setEditingField(def.fieldKey); setEditValue(value) }}
+                                    className="text-gray-300 hover:text-gray-500 p-0.5"
+                                    title="編集"
+                                  >
+                                    <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" />
+                                    </svg>
+                                  </button>
+                                )}
+                                <button
+                                  onClick={() => handleDeleteFieldDef(def.id)}
+                                  className="text-gray-300 hover:text-red-400 p-0.5"
+                                  title="項目削除"
+                                >
+                                  <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                                  </svg>
+                                </button>
+                              </div>
+                            </div>
+                            {isEditing ? (
+                              <div className="flex items-center gap-1 mt-1">
+                                <input
+                                  type={def.fieldType === 'date' ? 'date' : def.fieldType === 'number' ? 'number' : 'text'}
+                                  value={editValue}
+                                  onChange={(e) => setEditValue(e.target.value)}
+                                  onKeyDown={(e) => e.key === 'Enter' && handleSaveField(def.fieldKey)}
+                                  className="flex-1 text-sm border border-gray-300 rounded px-2 py-1 focus:outline-none focus:ring-1 focus:ring-green-500"
+                                  autoFocus
+                                />
+                                <button
+                                  onClick={() => handleSaveField(def.fieldKey)}
+                                  disabled={savingField}
+                                  className="px-2 py-1 text-xs font-medium rounded text-white"
+                                  style={{ backgroundColor: '#06C755' }}
+                                >
+                                  保存
+                                </button>
+                                <button
+                                  onClick={() => setEditingField(null)}
+                                  className="px-2 py-1 text-xs font-medium rounded text-gray-500 bg-gray-100"
+                                >
+                                  取消
+                                </button>
+                              </div>
+                            ) : (
+                              <p className="text-sm font-medium text-gray-900 truncate">
+                                {value || '-'}
+                              </p>
+                            )}
+                          </div>
+                        )
+                      })}
+                    </div>
+                  </div>
+                )}
+
+                {/* Add new field */}
+                <div>
+                  {showAddField ? (
+                    <div className="bg-gray-50 rounded-lg p-3 space-y-2">
+                      <input
+                        type="text"
+                        value={newFieldName}
+                        onChange={(e) => setNewFieldName(e.target.value)}
+                        placeholder="項目名（例: 住所、電話番号）"
+                        className="w-full text-sm border border-gray-300 rounded px-2 py-1.5 focus:outline-none focus:ring-1 focus:ring-green-500"
+                        autoFocus
+                      />
+                      <div className="flex gap-2">
+                        <button
+                          onClick={handleAddFieldDef}
+                          disabled={!newFieldName.trim() || addingField}
+                          className="flex-1 px-3 py-1.5 text-xs font-medium rounded text-white disabled:opacity-50"
+                          style={{ backgroundColor: '#06C755' }}
+                        >
+                          追加
+                        </button>
+                        <button
+                          onClick={() => { setShowAddField(false); setNewFieldName(''); setNewFieldKey('') }}
+                          className="px-3 py-1.5 text-xs font-medium rounded text-gray-500 bg-gray-200"
+                        >
+                          取消
+                        </button>
+                      </div>
+                    </div>
+                  ) : (
+                    <button
+                      onClick={() => setShowAddField(true)}
+                      className="w-full flex items-center justify-center gap-1 px-3 py-2 text-xs font-medium text-green-600 hover:text-green-700 hover:bg-green-50 rounded-lg border border-dashed border-green-300 transition-colors"
+                    >
+                      <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+                      </svg>
+                      項目を追加
+                    </button>
+                  )}
+                </div>
+              </>
+            )}
+          </div>
+        ) : (
+          /* Prescriptions tab */
+          <div className="p-3">
+            {loadingRx ? (
+              <div className="text-center py-8">
+                <div className="w-5 h-5 border-2 border-gray-300 border-t-green-500 rounded-full animate-spin mx-auto mb-2" />
+                <p className="text-xs text-gray-400">読み込み中...</p>
+              </div>
+            ) : prescriptions.length === 0 ? (
+              <div className="text-center py-8">
+                <p className="text-xs text-gray-400">処方せん履歴はありません</p>
+              </div>
+            ) : (
+              <div className="space-y-3">
+                {prescriptions.map((rx) => {
+                  const st = prescriptionStatusConfig[rx.status] || prescriptionStatusConfig.received
+                  return (
+                    <div key={rx.id} className="border border-gray-200 rounded-lg p-3">
+                      <div className="flex items-center justify-between mb-2">
+                        <span className="text-xs text-gray-500">
+                          {new Date(rx.createdAt).toLocaleString('ja-JP', {
+                            year: 'numeric', month: '2-digit', day: '2-digit',
+                            hour: '2-digit', minute: '2-digit',
+                          })}
+                        </span>
+                        <span
+                          className="inline-flex items-center px-1.5 py-0.5 rounded-full text-xs font-medium"
+                          style={{ color: st.color, backgroundColor: st.bg }}
+                        >
+                          {st.label}
+                        </span>
+                      </div>
+                      <p className="text-xs text-gray-500 mb-2">受取: {rx.pickupDisplay}</p>
+                      <div className="flex gap-1.5 flex-wrap">
+                        {rx.images.map((img, i) => (
+                          <div
+                            key={i}
+                            className="w-14 h-14 rounded border border-gray-200 overflow-hidden cursor-pointer hover:opacity-80 transition-opacity"
+                            onClick={() => setImageModal(img)}
+                          >
+                            <img src={img} alt={`処方せん${i + 1}`} className="w-full h-full object-cover" />
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )
+                })}
+              </div>
+            )}
+          </div>
+        )}
+      </div>
+
+      {/* Image modal */}
+      {imageModal && (
+        <div
+          className="fixed inset-0 z-50 bg-black/70 flex items-center justify-center p-4"
+          onClick={() => setImageModal(null)}
+        >
+          <div className="relative max-w-2xl max-h-[80vh]" onClick={e => e.stopPropagation()}>
+            <button
+              onClick={() => setImageModal(null)}
+              className="absolute -top-3 -right-3 w-8 h-8 bg-white rounded-full shadow-lg flex items-center justify-center text-gray-600 hover:text-gray-900 z-10"
+            >
+              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+              </svg>
+            </button>
+            <img src={imageModal} alt="処方せん拡大" className="max-w-full max-h-[80vh] rounded-lg object-contain" />
+          </div>
+        </div>
+      )}
     </div>
   )
 }
@@ -660,6 +1024,15 @@ export default function ChatsPage() {
             </>
           ) : null}
         </div>
+
+        {/* Far Right Panel: Friend Info & Prescriptions */}
+        {(selectedChatId && chatDetail) || selectedFriendId ? (
+          <FriendRightPanel
+            friendId={chatDetail?.friendId || selectedFriendId || ''}
+            friendName={chatDetail?.friendName || allFriends.find(f => f.id === selectedFriendId)?.displayName || ''}
+            accountId={selectedAccountId || ''}
+          />
+        ) : null}
       </div>
       <CcPromptButton prompts={ccPrompts} />
     </div>

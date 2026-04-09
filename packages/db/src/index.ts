@@ -23,6 +23,7 @@ export * from './forms';
 export * from './queue';
 export * from './rich-menus';
 export * from './prescriptions';
+export * from './custom-fields';
 
 /**
  * Thin wrapper around D1Database.

@@ -62,6 +62,25 @@ export async function fetchApi<T>(path: string, options?: RequestInit): Promise<
   return res.json() as Promise<T>
 }
 
+export type CustomFieldDefinition = {
+  id: string
+  fieldKey: string
+  name: string
+  fieldType: 'text' | 'number' | 'date' | 'select'
+  options: string[] | null
+  sortOrder: number
+  lineAccountId: string | null
+  createdAt: string
+}
+
+export type FriendInfo = {
+  customFields: Record<string, string>
+  prescriptionStats: {
+    count: number
+    lastDate: string | null
+  }
+}
+
 export type PrescriptionSubmission = {
   id: string
   friendId: string
@@ -557,6 +576,24 @@ export const api = {
       delete: (id: string) =>
         fetchApi<ApiResponse<null>>(`/api/rich-menu-tab-groups/${id}`, { method: 'DELETE' }),
     },
+  },
+  customFields: {
+    definitions: (accountId: string) =>
+      fetchApi<ApiResponse<CustomFieldDefinition[]>>(`/api/custom-fields/definitions?lineAccountId=${accountId}`),
+    createDefinition: (data: { fieldKey: string; name: string; fieldType?: string; options?: string[]; sortOrder?: number; lineAccountId?: string }) =>
+      fetchApi<ApiResponse<CustomFieldDefinition>>('/api/custom-fields/definitions', {
+        method: 'POST',
+        body: JSON.stringify(data),
+      }),
+    deleteDefinition: (id: string) =>
+      fetchApi<ApiResponse<null>>(`/api/custom-fields/definitions/${id}`, { method: 'DELETE' }),
+    getFriendInfo: (friendId: string) =>
+      fetchApi<ApiResponse<FriendInfo>>(`/api/friends/${friendId}/info`),
+    updateFriendFields: (friendId: string, fields: Record<string, string>) =>
+      fetchApi<ApiResponse<null>>(`/api/friends/${friendId}/custom-fields`, {
+        method: 'PUT',
+        body: JSON.stringify({ fields }),
+      }),
   },
   prescriptions: {
     list: (accountId: string) =>
