@@ -12,6 +12,8 @@ interface LineAccountListItem {
   displayName: string
   pictureUrl: string | null
   basicId: string | null
+  liffId: string | null
+  loginChannelId: string | null
   isActive: boolean
   createdAt: string
   updatedAt: string
@@ -46,7 +48,9 @@ export default function AccountsPage() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
   const [showCreate, setShowCreate] = useState(false)
-  const [form, setForm] = useState({ channelId: '', name: '', channelAccessToken: '', channelSecret: '' })
+  const [form, setForm] = useState({ channelId: '', name: '', channelAccessToken: '', channelSecret: '', liffId: '' })
+  const [editingLiff, setEditingLiff] = useState<string | null>(null)
+  const [liffDraft, setLiffDraft] = useState('')
 
   const load = async () => {
     setLoading(true)
@@ -70,8 +74,17 @@ export default function AccountsPage() {
     e.preventDefault()
     if (!form.channelId || !form.name || !form.channelAccessToken || !form.channelSecret) return
     try {
-      await api.lineAccounts.create(form)
-      setForm({ channelId: '', name: '', channelAccessToken: '', channelSecret: '' })
+      const res = await api.lineAccounts.create({
+        channelId: form.channelId,
+        name: form.name,
+        channelAccessToken: form.channelAccessToken,
+        channelSecret: form.channelSecret,
+      })
+      // If liffId was provided, update it separately
+      if (form.liffId && res.success && res.data) {
+        await api.lineAccounts.update((res.data as unknown as { id: string }).id, { liffId: form.liffId })
+      }
+      setForm({ channelId: '', name: '', channelAccessToken: '', channelSecret: '', liffId: '' })
       setShowCreate(false)
       load()
     } catch {}
@@ -85,6 +98,12 @@ export default function AccountsPage() {
 
   const handleToggle = async (id: string, currentActive: boolean) => {
     await api.lineAccounts.update(id, { isActive: !currentActive })
+    load()
+  }
+
+  const handleSaveLiffId = async (accountId: string) => {
+    await api.lineAccounts.update(accountId, { liffId: liffDraft || null })
+    setEditingLiff(null)
     load()
   }
 
@@ -153,6 +172,18 @@ export default function AccountsPage() {
                 required
               />
             </div>
+            <div className="sm:col-span-2">
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                LIFF ID <span className="text-gray-400 text-xs font-normal">(LINEログインチャネルで作成)</span>
+              </label>
+              <input
+                value={form.liffId}
+                onChange={(e) => setForm({ ...form, liffId: e.target.value })}
+                className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm"
+                placeholder="2001234567-aBcDeFgH"
+              />
+              <p className="text-xs text-gray-400 mt-1">QRコード受付やLIFF機能で使用します。LINE Developers &gt; LINEログイン &gt; LIFF で取得できます。</p>
+            </div>
           </div>
           <button
             type="submit"
@@ -219,6 +250,35 @@ export default function AccountsPage() {
                   <p className="text-xs text-gray-400">今月送信</p>
                 </div>
               </div>
+              {/* LIFF ID */}
+              <div className="py-2 border-t border-gray-100">
+                {editingLiff === account.id ? (
+                  <div className="flex items-center gap-2">
+                    <input
+                      value={liffDraft}
+                      onChange={(e) => setLiffDraft(e.target.value)}
+                      className="flex-1 border border-gray-300 rounded px-2 py-1 text-xs font-mono"
+                      placeholder="2001234567-aBcDeFgH"
+                      autoFocus
+                    />
+                    <button onClick={() => handleSaveLiffId(account.id)} className="text-xs text-green-600 font-medium">保存</button>
+                    <button onClick={() => setEditingLiff(null)} className="text-xs text-gray-400">取消</button>
+                  </div>
+                ) : (
+                  <div className="flex items-center justify-between">
+                    <p className="text-xs text-gray-500">
+                      LIFF: {account.liffId ? <span className="font-mono">{account.liffId}</span> : <span className="text-gray-300">未設定</span>}
+                    </p>
+                    <button
+                      onClick={() => { setEditingLiff(account.id); setLiffDraft(account.liffId || '') }}
+                      className="text-xs text-blue-500 hover:text-blue-700"
+                    >
+                      {account.liffId ? '変更' : '設定'}
+                    </button>
+                  </div>
+                )}
+              </div>
+
               <div className="flex items-center justify-between">
                 <p className="text-xs text-gray-400">
                   登録: {new Date(account.createdAt).toLocaleDateString('ja-JP')}

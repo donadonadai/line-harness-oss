@@ -103,7 +103,7 @@ queue.get('/api/queue/account-info', async (c) => {
     if (!account) return c.json({ success: false, error: 'Account not found' }, 404);
     return c.json({
       success: true,
-      data: { name: account.name },
+      data: { name: account.name, liffId: account.liff_id || null },
     });
   } catch (err) {
     console.error('GET /api/queue/account-info error:', err);

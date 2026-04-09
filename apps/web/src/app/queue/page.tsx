@@ -7,7 +7,7 @@ import { useAccount } from '@/contexts/account-context'
 import Header from '@/components/layout/header'
 import type { QueueSettings, QueueEntry } from '@line-crm/shared'
 
-const LIFF_BASE_URL = 'https://liff.line.me/2009554425-4IMBmLQ9'
+const LIFF_BASE_URL_FALLBACK = 'https://liff.line.me/2009554425-4IMBmLQ9'
 
 const statusLabels: Record<string, { label: string; color: string; bg: string }> = {
   waiting: { label: '待機中', color: '#d97706', bg: '#fef3c7' },
@@ -17,7 +17,7 @@ const statusLabels: Record<string, { label: string; color: string; bg: string }>
 }
 
 export default function QueuePage() {
-  const { selectedAccountId } = useAccount()
+  const { selectedAccountId, selectedAccount } = useAccount()
   const [settings, setSettings] = useState<QueueSettings | null>(null)
   const [entries, setEntries] = useState<QueueEntry[]>([])
   const [loading, setLoading] = useState(true)
@@ -29,13 +29,17 @@ export default function QueuePage() {
   const [copied, setCopied] = useState(false)
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null)
 
+  const liffBaseUrl = selectedAccount?.liffId
+    ? `https://liff.line.me/${selectedAccount.liffId}`
+    : LIFF_BASE_URL_FALLBACK
+
   const queueUrl = selectedAccountId
-    ? `${LIFF_BASE_URL}?page=queue&account=${selectedAccountId}`
+    ? `${liffBaseUrl}?page=queue&account=${selectedAccountId}`
     : ''
 
   // 友だち追加URL (LIFF経由 — 未友だちなら自動で友だち追加フローが走る)
   const friendAddUrl = selectedAccountId
-    ? `${LIFF_BASE_URL}?ref=queue-${selectedAccountId}`
+    ? `${liffBaseUrl}?ref=queue-${selectedAccountId}`
     : ''
 
   const fetchData = useCallback(async () => {
@@ -220,6 +224,15 @@ h1{font-size:28px;font-weight:800;color:#1a1a1a;margin-bottom:8px}
             <h2 className="text-base font-bold text-gray-900">来局受付用リンク</h2>
             <p className="text-xs text-gray-500 mt-1">お客様がスマートフォンで読み取って受付番号を取得できます</p>
           </div>
+
+          {!selectedAccount?.liffId && (
+            <div className="mx-6 mt-4 p-3 bg-yellow-50 border border-yellow-200 rounded-lg">
+              <p className="text-xs text-yellow-800">
+                ⚠️ このアカウントにLIFF IDが設定されていません。QRコードはデフォルトのLIFF（L Harness）に接続されます。
+                <a href="/accounts" className="ml-1 text-blue-600 underline">アカウント管理</a>でLIFF IDを設定してください。
+              </p>
+            </div>
+          )}
 
           <div className="p-6 grid grid-cols-1 lg:grid-cols-2 gap-8">
             {/* QR Code */}

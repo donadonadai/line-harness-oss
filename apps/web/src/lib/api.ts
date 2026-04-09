@@ -227,7 +227,7 @@ export const api = {
         method: 'POST',
         body: JSON.stringify(data),
       }),
-    update: (id: string, data: Partial<Pick<LineAccount, 'name' | 'channelAccessToken' | 'channelSecret' | 'isActive'>>) =>
+    update: (id: string, data: Partial<Pick<LineAccount, 'name' | 'channelAccessToken' | 'channelSecret' | 'isActive'>> & { liffId?: string | null; loginChannelId?: string | null; loginChannelSecret?: string | null }) =>
       fetchApi<ApiResponse<LineAccount>>(`/api/line-accounts/${id}`, {
         method: 'PUT',
         body: JSON.stringify(data),

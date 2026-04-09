@@ -16,6 +16,8 @@ function serializeLineAccount(row: DbLineAccount) {
     id: row.id,
     channelId: row.channel_id,
     name: row.name,
+    liffId: row.liff_id || null,
+    loginChannelId: row.login_channel_id || null,
     isActive: Boolean(row.is_active),
     createdAt: row.created_at,
     updatedAt: row.updated_at,
@@ -28,6 +30,7 @@ function serializeLineAccountFull(row: DbLineAccount) {
     ...serializeLineAccount(row),
     channelAccessToken: row.channel_access_token,
     channelSecret: row.channel_secret,
+    loginChannelSecret: row.login_channel_secret || null,
   };
 }
 
@@ -137,6 +140,9 @@ lineAccounts.put('/api/line-accounts/:id', async (c) => {
       channelAccessToken?: string;
       channelSecret?: string;
       isActive?: boolean;
+      liffId?: string | null;
+      loginChannelId?: string | null;
+      loginChannelSecret?: string | null;
     }>();
 
     const updated = await updateLineAccount(c.env.DB, id, {
@@ -144,6 +150,9 @@ lineAccounts.put('/api/line-accounts/:id', async (c) => {
       channel_access_token: body.channelAccessToken,
       channel_secret: body.channelSecret,
       is_active: body.isActive !== undefined ? (body.isActive ? 1 : 0) : undefined,
+      liff_id: body.liffId,
+      login_channel_id: body.loginChannelId,
+      login_channel_secret: body.loginChannelSecret,
     });
 
     if (!updated) {
