@@ -94,6 +94,23 @@ queue.get('/api/queue/entries', async (c) => {
   }
 });
 
+// LIFF account info — no auth required (returns only public name)
+queue.get('/api/queue/account-info', async (c) => {
+  try {
+    const lineAccountId = c.req.query('lineAccountId') ?? '';
+    if (!lineAccountId) return c.json({ success: false, error: 'lineAccountId is required' }, 400);
+    const account = await getLineAccountById(c.env.DB, lineAccountId);
+    if (!account) return c.json({ success: false, error: 'Account not found' }, 404);
+    return c.json({
+      success: true,
+      data: { name: account.name },
+    });
+  } catch (err) {
+    console.error('GET /api/queue/account-info error:', err);
+    return c.json({ success: false, error: 'Internal server error' }, 500);
+  }
+});
+
 // LIFF check-in — no auth required
 queue.post('/api/queue/checkin', async (c) => {
   try {

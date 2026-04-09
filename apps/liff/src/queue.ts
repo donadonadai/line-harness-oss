@@ -28,6 +28,7 @@ interface QueueState {
   profile: { userId: string; displayName: string; pictureUrl?: string } | null;
   friendId: string | null;
   accountId: string | null;
+  accountName: string | null;
   queueNumber: number | null;
   submitting: boolean;
   error: string | null;
@@ -37,6 +38,7 @@ const state: QueueState = {
   profile: null,
   friendId: null,
   accountId: null,
+  accountName: null,
   queueNumber: null,
   submitting: false,
   error: null,
@@ -74,13 +76,13 @@ function renderLoading(): void {
 }
 
 function renderCheckin(): void {
-  const { profile } = state;
+  const { profile, accountName } = state;
   if (!profile) return;
 
   getApp().innerHTML = `
     <div class="card">
       <div class="queue-icon">🏥</div>
-      <h2>受付</h2>
+      ${accountName ? `<h2>${escapeHtml(accountName)}</h2>` : '<h2>受付</h2>'}
       <div class="profile">
         ${profile.pictureUrl ? `<img src="${profile.pictureUrl}" alt="" />` : ''}
         <p class="name">${escapeHtml(profile.displayName)} さん</p>
@@ -97,11 +99,12 @@ function renderCheckin(): void {
 }
 
 function renderSuccess(): void {
-  const { profile, queueNumber } = state;
+  const { profile, queueNumber, accountName } = state;
   if (!profile || queueNumber === null) return;
 
   getApp().innerHTML = `
     <div class="card">
+      ${accountName ? `<p class="account-name">${escapeHtml(accountName)}</p>` : ''}
       <div class="queue-number-display">
         <div class="queue-number-circle">
           <span class="queue-number-value">${queueNumber}</span>
@@ -183,6 +186,17 @@ export async function initQueue(accountId: string | null): Promise<void> {
     return;
   }
   state.accountId = accountId;
+
+  // Fetch account name (best-effort)
+  try {
+    const infoRes = await apiCall(`/api/queue/account-info?lineAccountId=${encodeURIComponent(accountId)}`);
+    if (infoRes.ok) {
+      const infoJson = await infoRes.json() as { success: boolean; data?: { name?: string } };
+      if (infoJson?.data?.name) {
+        state.accountName = infoJson.data.name;
+      }
+    }
+  } catch { /* silent */ }
 
   try {
     const profile = await liff.getProfile();
