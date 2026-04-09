@@ -463,6 +463,7 @@ liffRoutes.post('/api/liff/link', async (c) => {
       displayName?: string | null;
       ref?: string;
       existingUuid?: string;
+      lineAccountId?: string;
     }>();
 
     if (!body.idToken) {
@@ -497,9 +498,20 @@ liffRoutes.post('/api/liff/link', async (c) => {
     const email = verified.email || null;
 
     const db = c.env.DB;
-    const friend = await getFriendByLineUserId(db, lineUserId);
+    let friend = await getFriendByLineUserId(db, lineUserId);
     if (!friend) {
-      return c.json({ success: false, error: 'Friend not found' }, 404);
+      // Auto-create friend record if not found (e.g. webhook follow event was missed)
+      friend = await upsertFriend(db, {
+        lineUserId,
+        displayName: body.displayName || verified.name || null,
+        pictureUrl: null,
+        statusMessage: null,
+      });
+      // Set line_account_id if provided (for multi-account tracking)
+      if (body.lineAccountId) {
+        await db.prepare('UPDATE friends SET line_account_id = ? WHERE id = ? AND line_account_id IS NULL')
+          .bind(body.lineAccountId, friend.id).run();
+      }
     }
 
     if ((friend as unknown as Record<string, unknown>).user_id) {

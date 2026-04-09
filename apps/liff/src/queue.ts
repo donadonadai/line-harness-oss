@@ -245,6 +245,7 @@ async function resolveAndShowCheckin(): Promise<void> {
             idToken: rawIdToken,
             displayName: state.profile?.displayName,
             existingUuid: friendId,
+            lineAccountId: state.accountId,
           }),
         });
         if (res.ok) {
