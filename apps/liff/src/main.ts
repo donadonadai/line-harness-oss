@@ -30,11 +30,30 @@ declare const liff: {
   closeWindow(): void;
 };
 
-// Resolve LIFF ID: check query param first, then fallback to env var
+// Resolve LIFF ID: check query param, liff.state, then fallback to env var
 function detectLiffId(): string {
   const params = new URLSearchParams(window.location.search);
+  // 1. Direct query param
   const fromParam = params.get('liffId');
   if (fromParam) return fromParam;
+  // 2. Encoded in liff.state (LINE encodes original query params here on redirect)
+  const liffState = params.get('liff.state');
+  if (liffState) {
+    try {
+      const stateParams = new URLSearchParams(liffState.startsWith('?') ? liffState : `?${liffState}`);
+      const fromState = stateParams.get('liffId');
+      if (fromState) return fromState;
+    } catch { /* ignore parse errors */ }
+  }
+  // 3. Check hash fragment (some LIFF versions put params there)
+  if (window.location.hash) {
+    try {
+      const hashParams = new URLSearchParams(window.location.hash.replace(/^#\/?/, ''));
+      const fromHash = hashParams.get('liffId');
+      if (fromHash) return fromHash;
+    } catch { /* ignore */ }
+  }
+  // 4. Fallback to build-time env var
   return import.meta.env?.VITE_LIFF_ID || '';
 }
 const LIFF_ID = detectLiffId();
@@ -42,6 +61,25 @@ const API_URL = import.meta.env?.VITE_API_URL || 'http://localhost:8787';
 const UUID_STORAGE_KEY = 'lh_uuid';
 // LINE公式アカウントの友だち追加URL（LINE Developers Console → Messaging API → Bot basic ID）
 const BOT_BASIC_ID = import.meta.env?.VITE_BOT_BASIC_ID || '';
+
+/**
+ * Get a query parameter, checking direct params and liff.state (LINE encodes
+ * the original query params in liff.state when redirecting to the endpoint URL).
+ */
+function getParam(key: string): string | null {
+  const params = new URLSearchParams(window.location.search);
+  const direct = params.get(key);
+  if (direct) return direct;
+  // Check liff.state
+  const liffState = params.get('liff.state');
+  if (liffState) {
+    try {
+      const stateParams = new URLSearchParams(liffState.startsWith('?') ? liffState : `?${liffState}`);
+      return stateParams.get(key);
+    } catch { /* ignore */ }
+  }
+  return null;
+}
 
 function apiCall(path: string, options?: RequestInit): Promise<Response> {
   return fetch(`${API_URL}${path}`, {
@@ -56,18 +94,15 @@ function apiCall(path: string, options?: RequestInit): Promise<Response> {
 function getPage(): string | null {
   const path = window.location.pathname.replace(/^\/+/, '');
   if (path === 'book') return 'book';
-  const params = new URLSearchParams(window.location.search);
-  return params.get('page');
+  return getParam('page');
 }
 
 function getRedirectUrl(): string | null {
-  const params = new URLSearchParams(window.location.search);
-  return params.get('redirect');
+  return getParam('redirect');
 }
 
 function getRef(): string | null {
-  const params = new URLSearchParams(window.location.search);
-  return params.get('ref');
+  return getParam('ref');
 }
 
 function getSavedUuid(): string | null {
@@ -259,12 +294,9 @@ async function main() {
     if (page === 'book') {
       await initBooking();
     } else if (page === 'form') {
-      const params = new URLSearchParams(window.location.search);
-      const formId = params.get('id');
-      await initForm(formId);
+      await initForm(getParam('id'));
     } else if (page === 'queue') {
-      const params = new URLSearchParams(window.location.search);
-      await initQueue(params.get('account'));
+      await initQueue(getParam('account'));
     } else {
       await linkAndAddFlow();
     }
