@@ -7,6 +7,7 @@ import {
   createQueueEntry,
   updateQueueEntryStatus,
   getLineAccountById,
+  getFriendById,
 } from '@line-crm/db';
 import { LineClient } from '@line-crm/line-sdk';
 import { fireEvent } from '../services/event-bus.js';
@@ -135,6 +136,80 @@ queue.post('/api/queue/checkin', async (c) => {
       friendId: body.friendId,
     });
 
+    // Send check-in confirmation message via LINE
+    const sendMessagePromise = (async () => {
+      try {
+        const friend = await getFriendById(c.env.DB, body.friendId);
+        if (!friend?.line_user_id) return;
+
+        // Resolve access token for this account
+        let accessToken = c.env.LINE_CHANNEL_ACCESS_TOKEN;
+        const account = await getLineAccountById(c.env.DB, body.lineAccountId);
+        if (account?.channel_access_token) {
+          accessToken = account.channel_access_token;
+        }
+        const accountName = account?.name || '薬局';
+
+        const lineClient = new LineClient(accessToken);
+        const name = friend.display_name || 'お客';
+
+        await lineClient.pushMessage(friend.line_user_id, [
+          {
+            type: 'flex',
+            altText: `受付番号${entry.queue_number}番で受付しました`,
+            contents: {
+              type: 'bubble',
+              size: 'kilo',
+              header: {
+                type: 'box',
+                layout: 'vertical',
+                contents: [
+                  { type: 'text', text: accountName, size: 'xs', color: '#888888', align: 'center' },
+                  { type: 'text', text: '受付完了', size: 'lg', weight: 'bold', color: '#06C755', align: 'center' },
+                ],
+                paddingBottom: 'sm',
+              },
+              body: {
+                type: 'box',
+                layout: 'vertical',
+                contents: [
+                  {
+                    type: 'text',
+                    text: String(entry.queue_number),
+                    size: '4xl',
+                    weight: 'bold',
+                    align: 'center',
+                    color: '#06C755',
+                  },
+                  { type: 'text', text: '受付番号', size: 'sm', align: 'center', color: '#888888', margin: 'xs' },
+                  { type: 'separator', margin: 'lg' },
+                  {
+                    type: 'text',
+                    text: `${name}様、受付が完了しました。\nお薬の準備ができましたらこちらのLINEでお知らせいたします。`,
+                    size: 'sm',
+                    wrap: true,
+                    margin: 'lg',
+                    color: '#555555',
+                  },
+                ],
+                paddingAll: 'xl',
+              },
+              footer: {
+                type: 'box',
+                layout: 'vertical',
+                contents: [
+                  { type: 'text', text: '※順番が近づきましたら店内にお戻りください', size: 'xxs', color: '#aaaaaa', align: 'center', wrap: true },
+                ],
+                paddingAll: 'sm',
+              },
+            },
+          },
+        ]);
+      } catch (msgErr) {
+        console.error('Queue checkin message error:', msgErr);
+      }
+    })();
+
     // Fire event for automations
     fireEvent(
       c.env.DB,
@@ -143,6 +218,9 @@ queue.post('/api/queue/checkin', async (c) => {
       c.env.LINE_CHANNEL_ACCESS_TOKEN,
       body.lineAccountId,
     ).catch((err) => console.error('fireEvent queue_checkin error:', err));
+
+    // Don't block response — send message in background
+    c.executionCtx.waitUntil(sendMessagePromise);
 
     return c.json({
       success: true,
