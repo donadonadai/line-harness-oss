@@ -304,8 +304,15 @@ friends.post('/api/friends/:id/messages', async (c) => {
       return c.json({ success: false, error: 'Friend not found' }, 404);
     }
 
+    // Resolve access token: use friend's account token, fallback to env
     const { LineClient } = await import('@line-crm/line-sdk');
-    const lineClient = new LineClient(c.env.LINE_CHANNEL_ACCESS_TOKEN);
+    let accessToken = c.env.LINE_CHANNEL_ACCESS_TOKEN;
+    if ((friend as unknown as Record<string, unknown>).line_account_id) {
+      const { getLineAccountById } = await import('@line-crm/db');
+      const account = await getLineAccountById(db, (friend as unknown as Record<string, string>).line_account_id);
+      if (account?.channel_access_token) accessToken = account.channel_access_token;
+    }
+    const lineClient = new LineClient(accessToken);
     const messageType = body.messageType ?? 'text';
 
     const message = buildMessage(messageType, body.content);

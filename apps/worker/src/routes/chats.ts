@@ -225,12 +225,18 @@ chats.post('/api/chats/:id/send', async (c) => {
     const friend = await c.env.DB
       .prepare(`SELECT * FROM friends WHERE id = ?`)
       .bind(chat.friend_id)
-      .first<{ id: string; line_user_id: string }>();
+      .first<{ id: string; line_user_id: string; line_account_id: string | null }>();
     if (!friend) return c.json({ success: false, error: 'Friend not found' }, 404);
 
-    // LINE APIでメッセージ送信
+    // Resolve access token: use friend's account token, fallback to env
     const { LineClient } = await import('@line-crm/line-sdk');
-    const lineClient = new LineClient(c.env.LINE_CHANNEL_ACCESS_TOKEN);
+    let accessToken = c.env.LINE_CHANNEL_ACCESS_TOKEN;
+    if (friend.line_account_id) {
+      const { getLineAccountById } = await import('@line-crm/db');
+      const account = await getLineAccountById(c.env.DB, friend.line_account_id);
+      if (account?.channel_access_token) accessToken = account.channel_access_token;
+    }
+    const lineClient = new LineClient(accessToken);
     const messageType = body.messageType ?? 'text';
 
     if (messageType === 'text') {
