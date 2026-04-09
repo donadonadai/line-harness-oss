@@ -1,10 +1,11 @@
 'use client'
 
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect, useRef, useCallback } from 'react'
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import { useAccount } from '@/contexts/account-context'
 import type { AccountWithStats } from '@/contexts/account-context'
+import { api } from '@/lib/api'
 
 // ─── メニュー定義（ユーザー目線のカテゴリ） ───
 
@@ -168,15 +169,50 @@ function NavIcon({ d }: { d: string }) {
   )
 }
 
+// Badge counts for menu items (keyed by href)
+type BadgeCounts = Record<string, number>
+
 export default function Sidebar() {
   const pathname = usePathname()
   const [isOpen, setIsOpen] = useState(false)
+  const { selectedAccountId } = useAccount()
+  const [badgeCounts, setBadgeCounts] = useState<BadgeCounts>({})
+  const badgeIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null)
 
   useEffect(() => { setIsOpen(false) }, [pathname])
   useEffect(() => {
     document.body.style.overflow = isOpen ? 'hidden' : ''
     return () => { document.body.style.overflow = '' }
   }, [isOpen])
+
+  // Poll pending prescription count
+  const fetchBadges = useCallback(async () => {
+    if (!selectedAccountId) {
+      setBadgeCounts({})
+      return
+    }
+    try {
+      const res = await api.prescriptions.pendingCount(selectedAccountId)
+      if (res.success && res.data.count > 0) {
+        setBadgeCounts(prev => ({ ...prev, '/prescriptions': res.data.count }))
+      } else {
+        setBadgeCounts(prev => {
+          const next = { ...prev }
+          delete next['/prescriptions']
+          return next
+        })
+      }
+    } catch {
+      // non-blocking
+    }
+  }, [selectedAccountId])
+
+  useEffect(() => {
+    fetchBadges()
+    if (badgeIntervalRef.current) clearInterval(badgeIntervalRef.current)
+    badgeIntervalRef.current = setInterval(fetchBadges, 30000) // 30 sec
+    return () => { if (badgeIntervalRef.current) clearInterval(badgeIntervalRef.current) }
+  }, [fetchBadges])
 
   const isActive = (href: string) => href === '/' ? pathname === '/' : pathname.startsWith(href)
 
@@ -210,6 +246,7 @@ export default function Sidebar() {
             {section.items.map((item) => {
               const active = isActive(item.href)
               const isDanger = 'danger' in item && item.danger
+              const badge = badgeCounts[item.href]
               return (
                 <Link
                   key={item.href}
@@ -224,7 +261,16 @@ export default function Sidebar() {
                   style={active ? { backgroundColor: isDanger ? '#EF4444' : '#06C755' } : {}}
                 >
                   <NavIcon d={item.icon} />
-                  {item.label}
+                  <span className="flex-1">{item.label}</span>
+                  {badge != null && badge > 0 && (
+                    <span
+                      className={`inline-flex items-center justify-center min-w-[20px] h-5 px-1.5 rounded-full text-xs font-bold ${
+                        active ? 'bg-white text-green-600' : 'bg-red-500 text-white'
+                      }`}
+                    >
+                      {badge > 99 ? '99+' : badge}
+                    </span>
+                  )}
                 </Link>
               )
             })}

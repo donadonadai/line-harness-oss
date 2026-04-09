@@ -561,6 +561,8 @@ export const api = {
   prescriptions: {
     list: (accountId: string) =>
       fetchApi<ApiResponse<PrescriptionSubmission[]>>(`/api/prescriptions?lineAccountId=${accountId}`),
+    pendingCount: (accountId: string) =>
+      fetchApi<ApiResponse<{ count: number }>>(`/api/prescriptions/pending-count?lineAccountId=${accountId}`),
     byFriend: (friendId: string) =>
       fetchApi<ApiResponse<PrescriptionSubmission[]>>(`/api/prescriptions/friend/${friendId}`),
     updateStatus: (id: string, status: string) =>

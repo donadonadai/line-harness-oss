@@ -13,6 +13,7 @@ import {
   getPrescriptionSubmissionById,
   updatePrescriptionStatus,
   getPrescriptionsByFriendId,
+  getPendingPrescriptionCount,
 } from '@line-crm/db';
 import { LineClient } from '@line-crm/line-sdk';
 import { fireEvent } from '../services/event-bus.js';
@@ -506,6 +507,20 @@ queue.put('/api/prescriptions/:id/status', async (c) => {
     return c.json({ success: true, data: null });
   } catch (err) {
     console.error('PUT /api/prescriptions/:id/status error:', err);
+    return c.json({ success: false, error: 'Internal server error' }, 500);
+  }
+});
+
+// GET /api/prescriptions/pending-count — admin (authed)
+queue.get('/api/prescriptions/pending-count', async (c) => {
+  try {
+    const lineAccountId = c.req.query('lineAccountId') ?? '';
+    if (!lineAccountId) return c.json({ success: false, error: 'lineAccountId is required' }, 400);
+
+    const count = await getPendingPrescriptionCount(c.env.DB, lineAccountId);
+    return c.json({ success: true, data: { count } });
+  } catch (err) {
+    console.error('GET /api/prescriptions/pending-count error:', err);
     return c.json({ success: false, error: 'Internal server error' }, 500);
   }
 });

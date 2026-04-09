@@ -110,6 +110,21 @@ export async function updatePrescriptionStatus(
     .run();
 }
 
+export async function getPendingPrescriptionCount(
+  db: D1Database,
+  lineAccountId: string,
+): Promise<number> {
+  const today = jstToday();
+  const row = await db
+    .prepare(
+      `SELECT COUNT(*) as cnt FROM prescription_submissions
+       WHERE line_account_id = ? AND status IN ('received', 'preparing') AND created_at >= ?`,
+    )
+    .bind(lineAccountId, today + 'T00:00:00')
+    .first<{ cnt: number }>();
+  return row?.cnt ?? 0;
+}
+
 export async function getPrescriptionsByFriendId(
   db: D1Database,
   friendId: string,
