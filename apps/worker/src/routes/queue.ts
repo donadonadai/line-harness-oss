@@ -40,6 +40,10 @@ queue.get('/api/queue/settings', async (c) => {
         lineAccountId: settings.line_account_id,
         isActive: Boolean(settings.is_active),
         notifyTemplate: settings.notify_template,
+        rxReceivedTitle: settings.rx_received_title,
+        rxReceivedBody: settings.rx_received_body,
+        rxReadyTitle: settings.rx_ready_title,
+        rxReadyBody: settings.rx_ready_body,
         createdAt: settings.created_at,
         updatedAt: settings.updated_at,
       },
@@ -52,7 +56,15 @@ queue.get('/api/queue/settings', async (c) => {
 
 queue.put('/api/queue/settings', async (c) => {
   try {
-    const body = await c.req.json<{ lineAccountId: string; isActive?: boolean; notifyTemplate?: string }>();
+    const body = await c.req.json<{
+      lineAccountId: string;
+      isActive?: boolean;
+      notifyTemplate?: string;
+      rxReceivedTitle?: string;
+      rxReceivedBody?: string;
+      rxReadyTitle?: string;
+      rxReadyBody?: string;
+    }>();
     if (!body.lineAccountId) return c.json({ success: false, error: 'lineAccountId is required' }, 400);
     const settings = await upsertQueueSettings(c.env.DB, body);
     return c.json({
@@ -62,6 +74,10 @@ queue.put('/api/queue/settings', async (c) => {
         lineAccountId: settings.line_account_id,
         isActive: Boolean(settings.is_active),
         notifyTemplate: settings.notify_template,
+        rxReceivedTitle: settings.rx_received_title,
+        rxReceivedBody: settings.rx_received_body,
+        rxReadyTitle: settings.rx_ready_title,
+        rxReadyBody: settings.rx_ready_body,
         createdAt: settings.created_at,
         updatedAt: settings.updated_at,
       },
@@ -329,14 +345,21 @@ queue.post('/api/prescriptions/submit', async (c) => {
           accessToken = account.channel_access_token;
         }
         const accountName = account?.name || '薬局';
-
-        const lineClient = new LineClient(accessToken);
         const name = friend.display_name || 'お客';
 
+        // Load customizable template from settings
+        const settings = await getQueueSettings(c.env.DB, body.lineAccountId);
+        const title = settings?.rx_received_title || '処方せん受付完了';
+        const bodyText = expandTemplate(
+          settings?.rx_received_body || '{{name}}様\n処方せんを受け付けました。\nお薬の準備ができましたらLINEでお知らせいたします。',
+          { name, pickup: body.pickupDisplay, account_name: accountName },
+        );
+
+        const lineClient = new LineClient(accessToken);
         await lineClient.pushMessage(friend.line_user_id, [
           {
             type: 'flex',
-            altText: '処方せん受付完了',
+            altText: title,
             contents: {
               type: 'bubble',
               size: 'kilo',
@@ -345,7 +368,7 @@ queue.post('/api/prescriptions/submit', async (c) => {
                 layout: 'vertical',
                 contents: [
                   { type: 'text', text: accountName, size: 'xs', color: '#888888', align: 'center' },
-                  { type: 'text', text: '処方せん受付完了', size: 'lg', weight: 'bold', color: '#06C755', align: 'center' },
+                  { type: 'text', text: title, size: 'lg', weight: 'bold', color: '#06C755', align: 'center' },
                 ],
                 paddingBottom: 'sm',
               },
@@ -356,18 +379,10 @@ queue.post('/api/prescriptions/submit', async (c) => {
                   { type: 'separator' },
                   {
                     type: 'text',
-                    text: `${name}様`,
-                    size: 'md',
-                    weight: 'bold',
-                    margin: 'lg',
-                    color: '#333333',
-                  },
-                  {
-                    type: 'text',
-                    text: '処方せんを受け付けました。\nお薬の準備ができましたらLINEでお知らせいたします。',
+                    text: bodyText,
                     size: 'sm',
                     wrap: true,
-                    margin: 'md',
+                    margin: 'lg',
                     color: '#555555',
                   },
                   { type: 'separator', margin: 'lg' },
@@ -461,11 +476,19 @@ queue.put('/api/prescriptions/:id/status', async (c) => {
           const accountName = account?.name || '薬局';
           const name = submission.display_name || 'お客';
 
+          // Load customizable template from settings
+          const settings = await getQueueSettings(c.env.DB, submission.line_account_id);
+          const title = settings?.rx_ready_title || 'お薬の準備完了';
+          const bodyText = expandTemplate(
+            settings?.rx_ready_body || '{{name}}様、お薬の準備ができました。\n窓口までお越しください。',
+            { name, account_name: accountName },
+          );
+
           const lineClient = new LineClient(accessToken);
           await lineClient.pushMessage(submission.line_user_id!, [
             {
               type: 'flex',
-              altText: 'お薬の準備ができました',
+              altText: title,
               contents: {
                 type: 'bubble',
                 size: 'kilo',
@@ -474,7 +497,7 @@ queue.put('/api/prescriptions/:id/status', async (c) => {
                   layout: 'vertical',
                   contents: [
                     { type: 'text', text: accountName, size: 'xs', color: '#888888', align: 'center' },
-                    { type: 'text', text: 'お薬の準備完了', size: 'lg', weight: 'bold', color: '#06C755', align: 'center' },
+                    { type: 'text', text: title, size: 'lg', weight: 'bold', color: '#06C755', align: 'center' },
                   ],
                   paddingBottom: 'sm',
                 },
@@ -485,7 +508,7 @@ queue.put('/api/prescriptions/:id/status', async (c) => {
                     { type: 'separator' },
                     {
                       type: 'text',
-                      text: `${name}様、お薬の準備ができました。\n窓口までお越しください。`,
+                      text: bodyText,
                       size: 'sm',
                       wrap: true,
                       margin: 'lg',

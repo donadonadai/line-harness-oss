@@ -9,7 +9,15 @@ import { api } from '@/lib/api'
 
 // ─── メニュー定義（ユーザー目線のカテゴリ） ───
 
-const menuSections = [
+type MenuItem = {
+  href: string
+  label: string
+  icon: string
+  danger?: boolean
+  children?: { href: string; label: string }[]
+}
+
+const menuSections: { label: string | null; items: MenuItem[] }[] = [
   {
     label: null, // セクションラベルなし（メイン）
     items: [
@@ -23,7 +31,9 @@ const menuSections = [
     items: [
       { href: '/scenarios', label: 'シナリオ配信', icon: 'M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-3 7h3m-3 4h3m-6-4h.01M9 16h.01' },
       { href: '/broadcasts', label: '一斉配信', icon: 'M11 5.882V19.24a1.76 1.76 0 01-3.417.592l-2.147-6.15M18 13a3 3 0 100-6M5.436 13.683A4.001 4.001 0 017 6h1.832c4.1 0 7.625-1.234 9.168-3v14c-1.543-1.766-5.067-3-9.168-3H7a3.988 3.988 0 01-1.564-.317z' },
-      { href: '/templates', label: 'テンプレート', icon: 'M4 5a1 1 0 011-1h14a1 1 0 011 1v2a1 1 0 01-1 1H5a1 1 0 01-1-1V5zM4 13a1 1 0 011-1h6a1 1 0 011 1v6a1 1 0 01-1 1H5a1 1 0 01-1-1v-6zM16 13a1 1 0 011-1h2a1 1 0 011 1v6a1 1 0 01-1 1h-2a1 1 0 01-1-1v-6z' },
+      { href: '/templates', label: 'テンプレート', icon: 'M4 5a1 1 0 011-1h14a1 1 0 011 1v2a1 1 0 01-1 1H5a1 1 0 01-1-1V5zM4 13a1 1 0 011-1h6a1 1 0 011 1v6a1 1 0 01-1 1H5a1 1 0 01-1-1v-6zM16 13a1 1 0 011-1h2a1 1 0 011 1v6a1 1 0 01-1 1h-2a1 1 0 01-1-1v-6z', children: [
+        { href: '/templates/prescription-notify', label: '処方せん通知' },
+      ] },
       { href: '/reminders', label: 'リマインダ', icon: 'M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z' },
       { href: '/rich-menus', label: 'リッチメニュー', icon: 'M4 6a2 2 0 012-2h12a2 2 0 012 2v12a2 2 0 01-2 2H6a2 2 0 01-2-2V6zm2 0v4h4V6H6zm6 0v4h4V6h-4zM6 12v4h4v-4H6zm6 0v4h4v-4h-4z' },
     ],
@@ -245,33 +255,56 @@ export default function Sidebar() {
             )}
             {section.items.map((item) => {
               const active = isActive(item.href)
-              const isDanger = 'danger' in item && item.danger
+              const isDanger = item.danger
               const badge = badgeCounts[item.href]
+              const hasActiveChild = item.children?.some((c) => isActive(c.href))
               return (
-                <Link
-                  key={item.href}
-                  href={item.href}
-                  className={`flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors ${
-                    active
-                      ? 'text-white'
-                      : isDanger
-                        ? 'text-red-500 hover:bg-red-50'
-                        : 'text-gray-600 hover:bg-gray-100 hover:text-gray-900'
-                  }`}
-                  style={active ? { backgroundColor: isDanger ? '#EF4444' : '#06C755' } : {}}
-                >
-                  <NavIcon d={item.icon} />
-                  <span className="flex-1">{item.label}</span>
-                  {badge != null && badge > 0 && (
-                    <span
-                      className={`inline-flex items-center justify-center min-w-[20px] h-5 px-1.5 rounded-full text-xs font-bold ${
-                        active ? 'bg-white text-green-600' : 'bg-red-500 text-white'
-                      }`}
-                    >
-                      {badge > 99 ? '99+' : badge}
-                    </span>
+                <div key={item.href}>
+                  <Link
+                    href={item.href}
+                    className={`flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors ${
+                      active && !hasActiveChild
+                        ? 'text-white'
+                        : isDanger
+                          ? 'text-red-500 hover:bg-red-50'
+                          : 'text-gray-600 hover:bg-gray-100 hover:text-gray-900'
+                    }`}
+                    style={active && !hasActiveChild ? { backgroundColor: isDanger ? '#EF4444' : '#06C755' } : {}}
+                  >
+                    <NavIcon d={item.icon} />
+                    <span className="flex-1">{item.label}</span>
+                    {badge != null && badge > 0 && (
+                      <span
+                        className={`inline-flex items-center justify-center min-w-[20px] h-5 px-1.5 rounded-full text-xs font-bold ${
+                          active && !hasActiveChild ? 'bg-white text-green-600' : 'bg-red-500 text-white'
+                        }`}
+                      >
+                        {badge > 99 ? '99+' : badge}
+                      </span>
+                    )}
+                  </Link>
+                  {/* Child menu items */}
+                  {item.children && (active || hasActiveChild) && (
+                    <div className="ml-8 mt-0.5 space-y-0.5">
+                      {item.children.map((child) => {
+                        const childActive = isActive(child.href)
+                        return (
+                          <Link
+                            key={child.href}
+                            href={child.href}
+                            className={`block px-3 py-1.5 rounded-md text-xs font-medium transition-colors ${
+                              childActive
+                                ? 'text-green-700 bg-green-50'
+                                : 'text-gray-500 hover:bg-gray-100 hover:text-gray-700'
+                            }`}
+                          >
+                            {child.label}
+                          </Link>
+                        )
+                      })}
+                    </div>
                   )}
-                </Link>
+                </div>
               )
             })}
           </div>

@@ -7,6 +7,10 @@ export interface QueueSettingsRow {
   line_account_id: string;
   is_active: number;
   notify_template: string;
+  rx_received_title: string;
+  rx_received_body: string;
+  rx_ready_title: string;
+  rx_ready_body: string;
   created_at: string;
   updated_at: string;
 }
@@ -36,7 +40,15 @@ export async function getQueueSettings(db: D1Database, lineAccountId: string): P
 
 export async function upsertQueueSettings(
   db: D1Database,
-  input: { lineAccountId: string; isActive?: boolean; notifyTemplate?: string },
+  input: {
+    lineAccountId: string;
+    isActive?: boolean;
+    notifyTemplate?: string;
+    rxReceivedTitle?: string;
+    rxReceivedBody?: string;
+    rxReadyTitle?: string;
+    rxReadyBody?: string;
+  },
 ): Promise<QueueSettingsRow> {
   const existing = await getQueueSettings(db, input.lineAccountId);
   const now = jstNow();
@@ -51,6 +63,22 @@ export async function upsertQueueSettings(
     if (input.notifyTemplate !== undefined) {
       sets.push('notify_template = ?');
       vals.push(input.notifyTemplate);
+    }
+    if (input.rxReceivedTitle !== undefined) {
+      sets.push('rx_received_title = ?');
+      vals.push(input.rxReceivedTitle);
+    }
+    if (input.rxReceivedBody !== undefined) {
+      sets.push('rx_received_body = ?');
+      vals.push(input.rxReceivedBody);
+    }
+    if (input.rxReadyTitle !== undefined) {
+      sets.push('rx_ready_title = ?');
+      vals.push(input.rxReadyTitle);
+    }
+    if (input.rxReadyBody !== undefined) {
+      sets.push('rx_ready_body = ?');
+      vals.push(input.rxReadyBody);
     }
     if (sets.length > 0) {
       sets.push('updated_at = ?');

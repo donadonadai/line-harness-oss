@@ -611,7 +611,15 @@ export const api = {
   queue: {
     getSettings: (accountId: string) =>
       fetchApi<ApiResponse<QueueSettings | null>>(`/api/queue/settings?lineAccountId=${accountId}`),
-    updateSettings: (data: { lineAccountId: string; isActive?: boolean; notifyTemplate?: string }) =>
+    updateSettings: (data: {
+      lineAccountId: string;
+      isActive?: boolean;
+      notifyTemplate?: string;
+      rxReceivedTitle?: string;
+      rxReceivedBody?: string;
+      rxReadyTitle?: string;
+      rxReadyBody?: string;
+    }) =>
       fetchApi<ApiResponse<QueueSettings>>('/api/queue/settings', {
         method: 'PUT',
         body: JSON.stringify(data),

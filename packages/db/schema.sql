@@ -520,6 +520,10 @@ CREATE TABLE IF NOT EXISTS queue_settings (
   line_account_id  TEXT NOT NULL,
   is_active        INTEGER NOT NULL DEFAULT 1,
   notify_template  TEXT NOT NULL DEFAULT '受付番号{{queue_number}}番の{{name}}様、お薬の準備ができました。窓口までお越しください。',
+  rx_received_title TEXT NOT NULL DEFAULT '処方せん受付完了',
+  rx_received_body  TEXT NOT NULL DEFAULT '{{name}}様\n処方せんを受け付けました。\nお薬の準備ができましたらLINEでお知らせいたします。',
+  rx_ready_title    TEXT NOT NULL DEFAULT 'お薬の準備完了',
+  rx_ready_body     TEXT NOT NULL DEFAULT '{{name}}様、お薬の準備ができました。\n窓口までお越しください。',
   created_at       TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%f', 'now', '+9 hours')),
   updated_at       TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%f', 'now', '+9 hours'))
 );

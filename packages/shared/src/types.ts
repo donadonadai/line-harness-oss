@@ -662,6 +662,10 @@ export interface QueueSettings {
   lineAccountId: string;
   isActive: boolean;
   notifyTemplate: string;
+  rxReceivedTitle: string;
+  rxReceivedBody: string;
+  rxReadyTitle: string;
+  rxReadyBody: string;
   createdAt: string;
   updatedAt: string;
 }
