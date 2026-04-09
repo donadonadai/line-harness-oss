@@ -131,6 +131,25 @@ export async function upsertFriendCustomFields(
   }
 }
 
+// --- Computed queue stats ---
+
+export async function getFriendQueueStats(
+  db: D1Database,
+  friendId: string,
+): Promise<{ count: number; lastDate: string | null }> {
+  const row = await db
+    .prepare(
+      `SELECT COUNT(*) as cnt, MAX(created_at) as last_date
+       FROM queue_entries WHERE friend_id = ?`,
+    )
+    .bind(friendId)
+    .first<{ cnt: number; last_date: string | null }>();
+  return {
+    count: row?.cnt ?? 0,
+    lastDate: row?.last_date ?? null,
+  };
+}
+
 // --- Computed prescription stats ---
 
 export async function getFriendPrescriptionStats(

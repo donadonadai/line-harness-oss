@@ -6,6 +6,7 @@ import {
   getFriendCustomFields,
   upsertFriendCustomFields,
   getFriendPrescriptionStats,
+  getFriendQueueStats,
 } from '@line-crm/db';
 import type { Env } from '../index.js';
 
@@ -92,9 +93,10 @@ customFields.get('/api/friends/:friendId/info', async (c) => {
   try {
     const friendId = c.req.param('friendId');
 
-    const [fields, prescriptionStats] = await Promise.all([
+    const [fields, prescriptionStats, queueStats] = await Promise.all([
       getFriendCustomFields(c.env.DB, friendId),
       getFriendPrescriptionStats(c.env.DB, friendId),
+      getFriendQueueStats(c.env.DB, friendId),
     ]);
 
     const customFieldsMap: Record<string, string> = {};
@@ -110,6 +112,12 @@ customFields.get('/api/friends/:friendId/info', async (c) => {
           count: prescriptionStats.count,
           lastDate: prescriptionStats.lastDate
             ? prescriptionStats.lastDate.slice(0, 10)
+            : null,
+        },
+        queueStats: {
+          count: queueStats.count,
+          lastDate: queueStats.lastDate
+            ? queueStats.lastDate.slice(0, 10)
             : null,
         },
       },

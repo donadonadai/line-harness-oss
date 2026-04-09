@@ -403,6 +403,27 @@ function FriendRightPanel({
                   </div>
                 </div>
 
+                {/* Queue stats */}
+                <div>
+                  <p className="text-[11px] font-semibold text-gray-400 uppercase tracking-wider mb-2">受付番号</p>
+                  <div className="space-y-2">
+                    <div className="flex justify-between items-center py-1.5 border-b border-gray-100">
+                      <span className="text-xs text-gray-500">最終利用日</span>
+                      <span className="text-sm font-medium text-gray-900">
+                        {info?.queueStats.lastDate
+                          ? info.queueStats.lastDate.replace(/-/g, '.')
+                          : '-'}
+                      </span>
+                    </div>
+                    <div className="flex justify-between items-center py-1.5 border-b border-gray-100">
+                      <span className="text-xs text-gray-500">発行回数</span>
+                      <span className="text-sm font-medium text-gray-900">
+                        {info?.queueStats.count ?? 0}
+                      </span>
+                    </div>
+                  </div>
+                </div>
+
                 {/* Custom fields */}
                 {definitions.length > 0 && (
                   <div>

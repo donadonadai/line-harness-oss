@@ -79,6 +79,10 @@ export type FriendInfo = {
     count: number
     lastDate: string | null
   }
+  queueStats: {
+    count: number
+    lastDate: string | null
+  }
 }
 
 export type PrescriptionSubmission = {
