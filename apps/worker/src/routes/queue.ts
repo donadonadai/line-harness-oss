@@ -101,9 +101,20 @@ queue.get('/api/queue/account-info', async (c) => {
     if (!lineAccountId) return c.json({ success: false, error: 'lineAccountId is required' }, 400);
     const account = await getLineAccountById(c.env.DB, lineAccountId);
     if (!account) return c.json({ success: false, error: 'Account not found' }, 404);
+    // Fetch bot basic ID from LINE API for friend-add URL
+    let basicId: string | null = null;
+    try {
+      const botRes = await fetch('https://api.line.me/v2/bot/info', {
+        headers: { Authorization: `Bearer ${account.channel_access_token}` },
+      });
+      if (botRes.ok) {
+        const botInfo = await botRes.json() as { basicId?: string };
+        basicId = botInfo.basicId || null;
+      }
+    } catch { /* best-effort */ }
     return c.json({
       success: true,
-      data: { name: account.name, liffId: account.liff_id || null },
+      data: { name: account.name, liffId: account.liff_id || null, basicId },
     });
   } catch (err) {
     console.error('GET /api/queue/account-info error:', err);

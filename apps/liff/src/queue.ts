@@ -2,10 +2,12 @@
  * LIFF Queue Check-in Page — Pharmacy reception number
  *
  * Flow:
- * 1. LIFF init → get profile
- * 2. Resolve friendId via /api/liff/link (same pattern as booking.ts)
- * 3. Show check-in button
- * 4. On tap → POST /api/queue/checkin → show reception number
+ * 1. LIFF init → get profile + account info
+ * 2. Check friendship via liff.getFriendship()
+ * 3. If not friend → show friend-add screen → wait for add → re-check
+ * 4. Resolve friendId via /api/liff/link
+ * 5. Show check-in button
+ * 6. On tap → POST /api/queue/checkin → show reception number
  *
  * Query params:
  *   ?account=xxx  — LINE account ID (required for multi-account)
@@ -17,6 +19,7 @@ declare const liff: {
   login(opts?: { redirectUri?: string }): void;
   getProfile(): Promise<{ userId: string; displayName: string; pictureUrl?: string }>;
   getIDToken(): string | null;
+  getFriendship(): Promise<{ friendFlag: boolean }>;
   isInClient(): boolean;
   closeWindow(): void;
 };
@@ -29,9 +32,9 @@ interface QueueState {
   friendId: string | null;
   accountId: string | null;
   accountName: string | null;
+  basicId: string | null;
   queueNumber: number | null;
   submitting: boolean;
-  error: string | null;
 }
 
 const state: QueueState = {
@@ -39,9 +42,9 @@ const state: QueueState = {
   friendId: null,
   accountId: null,
   accountName: null,
+  basicId: null,
   queueNumber: null,
   submitting: false,
-  error: null,
 };
 
 function escapeHtml(str: string): string {
@@ -73,6 +76,66 @@ function renderLoading(): void {
       <p class="message">読み込み中...</p>
     </div>
   `;
+}
+
+function renderFriendAdd(): void {
+  const { profile, accountName, basicId } = state;
+  if (!profile) return;
+
+  const friendAddUrl = basicId
+    ? `https://line.me/R/ti/p/@${basicId}`
+    : '#';
+
+  getApp().innerHTML = `
+    <div class="card">
+      <div class="queue-icon">🏥</div>
+      ${accountName ? `<h2>${escapeHtml(accountName)}</h2>` : '<h2>受付</h2>'}
+      <div class="profile">
+        ${profile.pictureUrl ? `<img src="${profile.pictureUrl}" alt="" />` : ''}
+        <p class="name">${escapeHtml(profile.displayName)} さん</p>
+      </div>
+      <p class="message">受付には友だち追加が必要です</p>
+      <a href="${friendAddUrl}" class="queue-checkin-btn" style="display:block;text-align:center;text-decoration:none;color:#fff;">
+        友だち追加して受付する
+      </a>
+      <p class="message" style="font-size:12px;color:#999;margin-top:12px;">
+        追加後、この画面に戻ってください
+      </p>
+      <button class="close-btn" data-action="recheck" style="margin-top:8px;">
+        友だち追加済みの方はこちら
+      </button>
+    </div>
+  `;
+
+  // Re-check button
+  getApp().querySelector('[data-action="recheck"]')?.addEventListener('click', () => {
+    recheckAndProceed();
+  });
+
+  // Auto re-check when user returns to this screen (after adding friend)
+  document.addEventListener('visibilitychange', onVisibilityChange);
+}
+
+async function onVisibilityChange(): Promise<void> {
+  if (document.visibilityState !== 'visible') return;
+  await recheckAndProceed();
+}
+
+async function recheckAndProceed(): Promise<void> {
+  document.removeEventListener('visibilitychange', onVisibilityChange);
+  renderLoading();
+  try {
+    const { friendFlag } = await liff.getFriendship();
+    if (friendFlag) {
+      // Friend added! Now link and show check-in
+      await resolveAndShowCheckin();
+    } else {
+      // Still not a friend
+      renderFriendAdd();
+    }
+  } catch {
+    renderFriendAdd();
+  }
 }
 
 function renderCheckin(): void {
@@ -138,13 +201,61 @@ function renderError(message: string): void {
     </div>
   `;
   getApp().querySelector('[data-action="retry"]')?.addEventListener('click', () => {
-    state.error = null;
     state.submitting = false;
-    renderCheckin();
+    recheckAndProceed();
   });
 }
 
 // ========== API ==========
+
+async function resolveAndShowCheckin(): Promise<void> {
+  renderLoading();
+
+  // Try to resolve friendId via /api/liff/link
+  let friendId: string | null = null;
+  try {
+    friendId = localStorage.getItem(UUID_STORAGE_KEY);
+  } catch { /* silent */ }
+
+  const rawIdToken = liff.getIDToken();
+  if (rawIdToken) {
+    // Retry link a few times (webhook may take a moment to create friend record)
+    for (let attempt = 0; attempt < 3; attempt++) {
+      try {
+        const res = await apiCall('/api/liff/link', {
+          method: 'POST',
+          body: JSON.stringify({
+            idToken: rawIdToken,
+            displayName: state.profile?.displayName,
+            existingUuid: friendId,
+          }),
+        });
+        if (res.ok) {
+          const data = await res.json() as { success: boolean; data?: { userId?: string } };
+          if (data?.data?.userId) {
+            try {
+              localStorage.setItem(UUID_STORAGE_KEY, data.data.userId);
+            } catch { /* silent */ }
+            friendId = data.data.userId;
+            break;
+          }
+        }
+      } catch { /* silent */ }
+      // Wait before retry (webhook needs time to process follow event)
+      if (attempt < 2) {
+        await new Promise((r) => setTimeout(r, 1500));
+      }
+    }
+  }
+
+  if (!friendId) {
+    renderError('友だち登録の反映に少し時間がかかっています。しばらくしてからやり直してください。');
+    return;
+  }
+
+  state.friendId = friendId;
+  renderCheckin();
+}
 
 async function submitCheckin(): Promise<void> {
   if (state.submitting || !state.friendId || !state.accountId) return;
@@ -187,59 +298,32 @@ export async function initQueue(accountId: string | null): Promise<void> {
   }
   state.accountId = accountId;
 
-  // Fetch account name (best-effort)
+  // Fetch account name + basic ID
   try {
     const infoRes = await apiCall(`/api/queue/account-info?lineAccountId=${encodeURIComponent(accountId)}`);
     if (infoRes.ok) {
-      const infoJson = await infoRes.json() as { success: boolean; data?: { name?: string } };
-      if (infoJson?.data?.name) {
-        state.accountName = infoJson.data.name;
-      }
+      const infoJson = await infoRes.json() as { success: boolean; data?: { name?: string; basicId?: string } };
+      if (infoJson?.data?.name) state.accountName = infoJson.data.name;
+      if (infoJson?.data?.basicId) state.basicId = infoJson.data.basicId;
     }
   } catch { /* silent */ }
 
   try {
-    const profile = await liff.getProfile();
+    // Get profile and friendship status in parallel
+    const [profile, friendship] = await Promise.all([
+      liff.getProfile(),
+      liff.getFriendship(),
+    ]);
     state.profile = profile;
 
-    // Resolve friendId via UUID linking (same pattern as booking.ts)
-    try {
-      state.friendId = localStorage.getItem(UUID_STORAGE_KEY);
-    } catch {
-      // silent
-    }
-
-    const rawIdToken = liff.getIDToken();
-    if (rawIdToken) {
-      try {
-        const res = await apiCall('/api/liff/link', {
-          method: 'POST',
-          body: JSON.stringify({
-            idToken: rawIdToken,
-            displayName: profile.displayName,
-            existingUuid: state.friendId,
-          }),
-        });
-        if (res.ok) {
-          const data = await res.json() as { success: boolean; data?: { userId?: string } };
-          if (data?.data?.userId) {
-            try {
-              localStorage.setItem(UUID_STORAGE_KEY, data.data.userId);
-              state.friendId = data.data.userId;
-            } catch { /* silent */ }
-          }
-        }
-      } catch {
-        // Silent fail — UUID linking is best-effort
-      }
-    }
-
-    if (!state.friendId) {
-      renderError('友だち情報が取得できませんでした。先に友だち追加を行ってください。');
+    if (!friendship.friendFlag) {
+      // Not a friend yet → show friend-add screen
+      renderFriendAdd();
       return;
     }
 
-    renderCheckin();
+    // Already a friend → resolve link and show check-in
+    await resolveAndShowCheckin();
   } catch (err) {
     renderError(err instanceof Error ? err.message : 'プロフィール取得に失敗しました');
   }
