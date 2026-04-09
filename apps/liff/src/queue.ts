@@ -249,12 +249,15 @@ async function resolveAndShowCheckin(): Promise<void> {
           }),
         });
         if (res.ok) {
-          const data = await res.json() as { success: boolean; data?: { userId?: string } };
+          const data = await res.json() as { success: boolean; data?: { userId?: string; friendId?: string } };
           if (data?.data?.userId) {
             try {
               localStorage.setItem(UUID_STORAGE_KEY, data.data.userId);
             } catch { /* silent */ }
-            friendId = data.data.userId;
+          }
+          // Use friendId (friends table ID) for queue checkin
+          if (data?.data?.friendId) {
+            friendId = data.data.friendId;
             break;
           }
         }
