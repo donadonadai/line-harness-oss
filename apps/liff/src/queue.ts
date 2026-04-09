@@ -107,7 +107,8 @@ function renderFriendAdd(): void {
   getApp().querySelector('[data-action="add-friend"]')?.addEventListener('click', () => {
     if (basicId) {
       // Try multiple URL formats for maximum compatibility inside LINE
-      const url = `https://line.me/R/ti/p/@${basicId}`;
+      const cleanId = basicId.startsWith('@') ? basicId : `@${basicId}`;
+      const url = `https://line.me/R/ti/p/${cleanId}`;
       if (liff.isInClient()) {
         // Inside LINE app: use location to navigate
         window.location.href = url;
