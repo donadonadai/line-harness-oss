@@ -19,7 +19,8 @@ export async function authMiddleware(c: Context<Env>, next: Next): Promise<Respo
     path.match(/^\/api\/forms\/[^/]+\/submit$/) ||
     path.match(/^\/api\/forms\/[^/]+$/) || // GET form definition (public for LIFF)
     path === '/api/queue/checkin' || // LIFF queue check-in (public)
-    path === '/api/queue/account-info' // LIFF queue account info (public)
+    path === '/api/queue/account-info' || // LIFF queue account info (public)
+    path === '/api/prescriptions/submit' // LIFF prescription submission (public)
   ) {
     return next();
   }

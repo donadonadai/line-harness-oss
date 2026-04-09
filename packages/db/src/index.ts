@@ -22,6 +22,7 @@ export * from './tracked-links';
 export * from './forms';
 export * from './queue';
 export * from './rich-menus';
+export * from './prescriptions';
 
 /**
  * Thin wrapper around D1Database.

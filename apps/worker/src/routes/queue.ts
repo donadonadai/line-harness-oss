@@ -8,6 +8,10 @@ import {
   updateQueueEntryStatus,
   getLineAccountById,
   getFriendById,
+  createPrescriptionSubmission,
+  getPrescriptionSubmissions,
+  getPrescriptionSubmissionById,
+  updatePrescriptionStatus,
 } from '@line-crm/db';
 import { LineClient } from '@line-crm/line-sdk';
 import { fireEvent } from '../services/event-bus.js';
@@ -280,6 +284,227 @@ queue.put('/api/queue/entries/:id/status', async (c) => {
     return c.json({ success: true, data: null });
   } catch (err) {
     console.error('PUT /api/queue/entries/:id/status error:', err);
+    return c.json({ success: false, error: 'Internal server error' }, 500);
+  }
+});
+
+// ========== Prescription Submissions ==========
+
+// POST /api/prescriptions/submit — LIFF (public)
+queue.post('/api/prescriptions/submit', async (c) => {
+  try {
+    const body = await c.req.json<{
+      lineAccountId: string;
+      friendId: string;
+      images: string[];
+      pickupTime: string;
+      pickupDisplay: string;
+      note?: string;
+    }>();
+
+    if (!body.lineAccountId || !body.friendId || !body.images?.length || !body.pickupTime || !body.pickupDisplay) {
+      return c.json({ success: false, error: 'Missing required fields' }, 400);
+    }
+
+    const submission = await createPrescriptionSubmission(c.env.DB, {
+      lineAccountId: body.lineAccountId,
+      friendId: body.friendId,
+      images: body.images,
+      pickupTime: body.pickupTime,
+      pickupDisplay: body.pickupDisplay,
+      note: body.note,
+    });
+
+    // Send Flex message confirmation to user via LINE (background)
+    const sendMessagePromise = (async () => {
+      try {
+        const friend = await getFriendById(c.env.DB, body.friendId);
+        if (!friend?.line_user_id) return;
+
+        let accessToken = c.env.LINE_CHANNEL_ACCESS_TOKEN;
+        const account = await getLineAccountById(c.env.DB, body.lineAccountId);
+        if (account?.channel_access_token) {
+          accessToken = account.channel_access_token;
+        }
+        const accountName = account?.name || '薬局';
+
+        const lineClient = new LineClient(accessToken);
+        const name = friend.display_name || 'お客';
+
+        await lineClient.pushMessage(friend.line_user_id, [
+          {
+            type: 'flex',
+            altText: '処方せん受付完了',
+            contents: {
+              type: 'bubble',
+              size: 'kilo',
+              header: {
+                type: 'box',
+                layout: 'vertical',
+                contents: [
+                  { type: 'text', text: accountName, size: 'xs', color: '#888888', align: 'center' },
+                  { type: 'text', text: '処方せん受付完了', size: 'lg', weight: 'bold', color: '#06C755', align: 'center' },
+                ],
+                paddingBottom: 'sm',
+              },
+              body: {
+                type: 'box',
+                layout: 'vertical',
+                contents: [
+                  { type: 'separator' },
+                  {
+                    type: 'text',
+                    text: `${name}様`,
+                    size: 'md',
+                    weight: 'bold',
+                    margin: 'lg',
+                    color: '#333333',
+                  },
+                  {
+                    type: 'text',
+                    text: '処方せんを受け付けました。\nお薬の準備ができましたらLINEでお知らせいたします。',
+                    size: 'sm',
+                    wrap: true,
+                    margin: 'md',
+                    color: '#555555',
+                  },
+                  { type: 'separator', margin: 'lg' },
+                  {
+                    type: 'text',
+                    text: `受取目安: ${body.pickupDisplay}`,
+                    size: 'sm',
+                    color: '#888888',
+                    margin: 'md',
+                    align: 'center',
+                  },
+                ],
+                paddingAll: 'xl',
+              },
+            },
+          },
+        ]);
+      } catch (msgErr) {
+        console.error('Prescription submit message error:', msgErr);
+      }
+    })();
+
+    c.executionCtx.waitUntil(sendMessagePromise);
+
+    return c.json({
+      success: true,
+      data: {
+        id: submission.id,
+        status: submission.status,
+        pickupDisplay: submission.pickup_display,
+        createdAt: submission.created_at,
+      },
+    }, 201);
+  } catch (err) {
+    console.error('POST /api/prescriptions/submit error:', err);
+    return c.json({ success: false, error: 'Internal server error' }, 500);
+  }
+});
+
+// GET /api/prescriptions — admin (authed)
+queue.get('/api/prescriptions', async (c) => {
+  try {
+    const lineAccountId = c.req.query('lineAccountId') ?? '';
+    if (!lineAccountId) return c.json({ success: false, error: 'lineAccountId is required' }, 400);
+
+    const submissions = await getPrescriptionSubmissions(c.env.DB, lineAccountId);
+    return c.json({
+      success: true,
+      data: submissions.map((s) => ({
+        id: s.id,
+        friendId: s.friend_id,
+        lineAccountId: s.line_account_id,
+        images: JSON.parse(s.images),
+        pickupTime: s.pickup_time,
+        pickupDisplay: s.pickup_display,
+        status: s.status,
+        note: s.note,
+        createdAt: s.created_at,
+        updatedAt: s.updated_at,
+        displayName: s.display_name,
+        lineUserId: s.line_user_id,
+      })),
+    });
+  } catch (err) {
+    console.error('GET /api/prescriptions error:', err);
+    return c.json({ success: false, error: 'Internal server error' }, 500);
+  }
+});
+
+// PUT /api/prescriptions/:id/status — admin (authed)
+queue.put('/api/prescriptions/:id/status', async (c) => {
+  try {
+    const id = c.req.param('id');
+    const body = await c.req.json<{ status: string }>();
+    if (!body.status) return c.json({ success: false, error: 'status is required' }, 400);
+
+    const submission = await getPrescriptionSubmissionById(c.env.DB, id);
+    if (!submission) return c.json({ success: false, error: 'Prescription submission not found' }, 404);
+
+    await updatePrescriptionStatus(c.env.DB, id, body.status);
+
+    // Send LINE notification when status = 'ready'
+    if (body.status === 'ready' && submission.line_user_id) {
+      const notifyPromise = (async () => {
+        try {
+          let accessToken = c.env.LINE_CHANNEL_ACCESS_TOKEN;
+          const account = await getLineAccountById(c.env.DB, submission.line_account_id);
+          if (account?.channel_access_token) {
+            accessToken = account.channel_access_token;
+          }
+          const accountName = account?.name || '薬局';
+          const name = submission.display_name || 'お客';
+
+          const lineClient = new LineClient(accessToken);
+          await lineClient.pushMessage(submission.line_user_id!, [
+            {
+              type: 'flex',
+              altText: 'お薬の準備ができました',
+              contents: {
+                type: 'bubble',
+                size: 'kilo',
+                header: {
+                  type: 'box',
+                  layout: 'vertical',
+                  contents: [
+                    { type: 'text', text: accountName, size: 'xs', color: '#888888', align: 'center' },
+                    { type: 'text', text: 'お薬の準備完了', size: 'lg', weight: 'bold', color: '#06C755', align: 'center' },
+                  ],
+                  paddingBottom: 'sm',
+                },
+                body: {
+                  type: 'box',
+                  layout: 'vertical',
+                  contents: [
+                    { type: 'separator' },
+                    {
+                      type: 'text',
+                      text: `${name}様、お薬の準備ができました。\n窓口までお越しください。`,
+                      size: 'sm',
+                      wrap: true,
+                      margin: 'lg',
+                      color: '#555555',
+                    },
+                  ],
+                  paddingAll: 'xl',
+                },
+              },
+            },
+          ]);
+        } catch (notifyErr) {
+          console.error('Prescription ready notification error:', notifyErr);
+        }
+      })();
+      c.executionCtx.waitUntil(notifyPromise);
+    }
+
+    return c.json({ success: true, data: null });
+  } catch (err) {
+    console.error('PUT /api/prescriptions/:id/status error:', err);
     return c.json({ success: false, error: 'Internal server error' }, 500);
   }
 });

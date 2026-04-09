@@ -603,3 +603,21 @@ CREATE TABLE IF NOT EXISTS rich_menu_segment_rules (
   updated_at      TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%f', 'now', '+9 hours'))
 );
 CREATE INDEX IF NOT EXISTS idx_rm_segment_active ON rich_menu_segment_rules (is_active, priority DESC);
+
+-- ─────────────────────────────────────────────────────────────
+-- Round 6: 処方せん受付 (Prescription Submission)
+-- ─────────────────────────────────────────────────────────────
+
+CREATE TABLE IF NOT EXISTS prescription_submissions (
+  id TEXT PRIMARY KEY,
+  friend_id TEXT NOT NULL,
+  line_account_id TEXT NOT NULL,
+  images TEXT NOT NULL DEFAULT '[]',
+  pickup_time TEXT NOT NULL,
+  pickup_display TEXT NOT NULL,
+  status TEXT NOT NULL DEFAULT 'received',
+  note TEXT,
+  created_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%f', 'now', '+9 hours')),
+  updated_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%f', 'now', '+9 hours'))
+);
+CREATE INDEX IF NOT EXISTS idx_prescription_account ON prescription_submissions (line_account_id, status);

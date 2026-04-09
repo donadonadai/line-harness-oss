@@ -17,6 +17,7 @@
 import { initBooking } from './booking.js';
 import { initForm } from './form.js';
 import { initQueue } from './queue.js';
+import { initPrescription } from './prescription.js';
 
 declare const liff: {
   init(config: { liffId: string }): Promise<void>;
@@ -297,6 +298,8 @@ async function main() {
       await initForm(getParam('id'));
     } else if (page === 'queue') {
       await initQueue(getParam('account'));
+    } else if (page === 'prescription') {
+      await initPrescription(getParam('account'));
     } else {
       await linkAndAddFlow();
     }
