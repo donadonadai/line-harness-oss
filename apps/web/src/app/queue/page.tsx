@@ -29,17 +29,19 @@ export default function QueuePage() {
   const [copied, setCopied] = useState(false)
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null)
 
-  const liffBaseUrl = selectedAccount?.liffId
-    ? `https://liff.line.me/${selectedAccount.liffId}`
+  const accountLiffId = selectedAccount?.liffId
+  const liffBaseUrl = accountLiffId
+    ? `https://liff.line.me/${accountLiffId}`
     : LIFF_BASE_URL_FALLBACK
 
+  // liffId param ensures liff.init() uses the correct LIFF ID (see main.ts detectLiffId())
   const queueUrl = selectedAccountId
-    ? `${liffBaseUrl}?page=queue&account=${selectedAccountId}`
+    ? `${liffBaseUrl}?page=queue&account=${selectedAccountId}${accountLiffId ? `&liffId=${accountLiffId}` : ''}`
     : ''
 
   // 友だち追加URL (LIFF経由 — 未友だちなら自動で友だち追加フローが走る)
   const friendAddUrl = selectedAccountId
-    ? `${liffBaseUrl}?ref=queue-${selectedAccountId}`
+    ? `${liffBaseUrl}?ref=queue-${selectedAccountId}${accountLiffId ? `&liffId=${accountLiffId}` : ''}`
     : ''
 
   const fetchData = useCallback(async () => {
