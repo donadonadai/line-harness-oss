@@ -1,8 +1,8 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import type { Tag } from '@line-crm/shared'
-import type { FriendWithTags } from '@/lib/api'
+import type { FriendWithTags, PrescriptionSubmission } from '@/lib/api'
 import { api } from '@/lib/api'
 import TagBadge from './tag-badge'
 
@@ -12,19 +12,43 @@ interface FriendTableProps {
   onRefresh: () => void
 }
 
+const prescriptionStatusConfig: Record<string, { label: string; color: string; bg: string }> = {
+  received: { label: '受付済み', color: '#d97706', bg: '#fef3c7' },
+  preparing: { label: '準備中', color: '#2563eb', bg: '#dbeafe' },
+  ready: { label: '準備完了', color: '#059669', bg: '#d1fae5' },
+  done: { label: '受渡完了', color: '#6b7280', bg: '#f3f4f6' },
+  cancelled: { label: 'キャンセル', color: '#dc2626', bg: '#fee2e2' },
+}
+
 export default function FriendTable({ friends, allTags, onRefresh }: FriendTableProps) {
   const [expandedId, setExpandedId] = useState<string | null>(null)
   const [addingTagForFriend, setAddingTagForFriend] = useState<string | null>(null)
   const [selectedTagId, setSelectedTagId] = useState('')
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
+  const [prescriptions, setPrescriptions] = useState<PrescriptionSubmission[]>([])
+  const [prescriptionsLoading, setPrescriptionsLoading] = useState(false)
+  const [prescriptionImage, setPrescriptionImage] = useState<string | null>(null)
 
   const toggleExpand = (id: string) => {
     setExpandedId(expandedId === id ? null : id)
     setAddingTagForFriend(null)
     setSelectedTagId('')
     setError('')
+    setPrescriptions([])
   }
+
+  // Load prescriptions when a friend is expanded
+  useEffect(() => {
+    if (!expandedId) return
+    setPrescriptionsLoading(true)
+    api.prescriptions.byFriend(expandedId)
+      .then((res) => {
+        if (res.success) setPrescriptions(res.data)
+      })
+      .catch(() => { /* non-blocking */ })
+      .finally(() => setPrescriptionsLoading(false))
+  }, [expandedId])
 
   const handleAddTag = async (friendId: string) => {
     if (!selectedTagId) return
@@ -244,16 +268,98 @@ export default function FriendTable({ friends, allTags, onRefresh }: FriendTable
                             )
                           )}
                         </div>
+
+                        {/* Prescription history */}
+                        <div>
+                          <p className="text-xs font-semibold text-gray-500 mb-2">処方せん履歴</p>
+                          {prescriptionsLoading ? (
+                            <div className="flex items-center gap-2 text-xs text-gray-400">
+                              <div className="w-3 h-3 border-2 border-gray-300 border-t-green-500 rounded-full animate-spin" />
+                              読み込み中...
+                            </div>
+                          ) : prescriptions.length === 0 ? (
+                            <p className="text-xs text-gray-400">処方せんの受付履歴はありません</p>
+                          ) : (
+                            <div className="space-y-2 max-h-64 overflow-y-auto">
+                              {prescriptions.map((rx) => {
+                                const st = prescriptionStatusConfig[rx.status] || prescriptionStatusConfig.received
+                                return (
+                                  <div
+                                    key={rx.id}
+                                    className="bg-white rounded-lg border border-gray-200 p-3"
+                                    onClick={(e) => e.stopPropagation()}
+                                  >
+                                    <div className="flex items-center justify-between mb-2">
+                                      <div className="flex items-center gap-2">
+                                        <span className="text-xs text-gray-500">
+                                          {new Date(rx.createdAt).toLocaleString('ja-JP', {
+                                            year: 'numeric', month: '2-digit', day: '2-digit',
+                                            hour: '2-digit', minute: '2-digit',
+                                          })}
+                                        </span>
+                                        <span
+                                          className="inline-flex items-center px-1.5 py-0.5 rounded-full text-xs font-medium"
+                                          style={{ color: st.color, backgroundColor: st.bg }}
+                                        >
+                                          {st.label}
+                                        </span>
+                                      </div>
+                                      <span className="text-xs text-gray-400">
+                                        受取: {rx.pickupDisplay}
+                                      </span>
+                                    </div>
+                                    <div className="flex gap-1.5">
+                                      {rx.images.map((img, i) => (
+                                        <div
+                                          key={i}
+                                          className="w-14 h-14 rounded border border-gray-200 overflow-hidden cursor-pointer hover:opacity-80 transition-opacity"
+                                          onClick={() => setPrescriptionImage(img)}
+                                        >
+                                          <img src={img} alt={`処方せん${i + 1}`} className="w-full h-full object-cover" />
+                                        </div>
+                                      ))}
+                                    </div>
+                                  </div>
+                                )
+                              })}
+                            </div>
+                          )}
+                        </div>
                       </div>
                     </td>
                   </tr>
                 )}
+
               </>
             )
           })}
         </tbody>
       </table>
       </div>
+
+      {/* Prescription image modal */}
+      {prescriptionImage && (
+        <div
+          className="fixed inset-0 z-50 bg-black/70 flex items-center justify-center p-4"
+          onClick={() => setPrescriptionImage(null)}
+        >
+          <div className="relative max-w-2xl max-h-[80vh]" onClick={e => e.stopPropagation()}>
+            <button
+              onClick={() => setPrescriptionImage(null)}
+              className="absolute -top-3 -right-3 w-8 h-8 bg-white rounded-full shadow-lg flex items-center justify-center text-gray-600 hover:text-gray-900 z-10"
+            >
+              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+              </svg>
+            </button>
+            <img
+              src={prescriptionImage}
+              alt="処方せん拡大"
+              className="max-w-full max-h-[80vh] rounded-lg object-contain"
+            />
+          </div>
+        </div>
+      )}
     </div>
   )
 }

@@ -109,3 +109,16 @@ export async function updatePrescriptionStatus(
     .bind(status, now, id)
     .run();
 }
+
+export async function getPrescriptionsByFriendId(
+  db: D1Database,
+  friendId: string,
+): Promise<PrescriptionSubmissionRow[]> {
+  const result = await db
+    .prepare(
+      `SELECT * FROM prescription_submissions WHERE friend_id = ? ORDER BY created_at DESC`,
+    )
+    .bind(friendId)
+    .all<PrescriptionSubmissionRow>();
+  return result.results;
+}

@@ -62,6 +62,21 @@ export async function fetchApi<T>(path: string, options?: RequestInit): Promise<
   return res.json() as Promise<T>
 }
 
+export type PrescriptionSubmission = {
+  id: string
+  friendId: string
+  lineAccountId: string
+  images: string[]
+  pickupTime: string
+  pickupDisplay: string
+  status: string
+  note: string | null
+  createdAt: string
+  updatedAt: string
+  displayName?: string | null
+  lineUserId?: string | null
+}
+
 export type FriendListParams = {
   offset?: string
   limit?: string
@@ -542,6 +557,17 @@ export const api = {
       delete: (id: string) =>
         fetchApi<ApiResponse<null>>(`/api/rich-menu-tab-groups/${id}`, { method: 'DELETE' }),
     },
+  },
+  prescriptions: {
+    list: (accountId: string) =>
+      fetchApi<ApiResponse<PrescriptionSubmission[]>>(`/api/prescriptions?lineAccountId=${accountId}`),
+    byFriend: (friendId: string) =>
+      fetchApi<ApiResponse<PrescriptionSubmission[]>>(`/api/prescriptions/friend/${friendId}`),
+    updateStatus: (id: string, status: string) =>
+      fetchApi<ApiResponse<null>>(`/api/prescriptions/${id}/status`, {
+        method: 'PUT',
+        body: JSON.stringify({ status }),
+      }),
   },
   queue: {
     getSettings: (accountId: string) =>

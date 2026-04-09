@@ -12,6 +12,7 @@ import {
   getPrescriptionSubmissions,
   getPrescriptionSubmissionById,
   updatePrescriptionStatus,
+  getPrescriptionsByFriendId,
 } from '@line-crm/db';
 import { LineClient } from '@line-crm/line-sdk';
 import { fireEvent } from '../services/event-bus.js';
@@ -505,6 +506,32 @@ queue.put('/api/prescriptions/:id/status', async (c) => {
     return c.json({ success: true, data: null });
   } catch (err) {
     console.error('PUT /api/prescriptions/:id/status error:', err);
+    return c.json({ success: false, error: 'Internal server error' }, 500);
+  }
+});
+
+// GET /api/prescriptions/friend/:friendId — admin (authed)
+queue.get('/api/prescriptions/friend/:friendId', async (c) => {
+  try {
+    const friendId = c.req.param('friendId');
+    const submissions = await getPrescriptionsByFriendId(c.env.DB, friendId);
+    return c.json({
+      success: true,
+      data: submissions.map((s) => ({
+        id: s.id,
+        friendId: s.friend_id,
+        lineAccountId: s.line_account_id,
+        images: JSON.parse(s.images),
+        pickupTime: s.pickup_time,
+        pickupDisplay: s.pickup_display,
+        status: s.status,
+        note: s.note,
+        createdAt: s.created_at,
+        updatedAt: s.updated_at,
+      })),
+    });
+  } catch (err) {
+    console.error('GET /api/prescriptions/friend/:friendId error:', err);
     return c.json({ success: false, error: 'Internal server error' }, 500);
   }
 });
