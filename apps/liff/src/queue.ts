@@ -82,10 +82,6 @@ function renderFriendAdd(): void {
   const { profile, accountName, basicId } = state;
   if (!profile) return;
 
-  const friendAddUrl = basicId
-    ? `https://line.me/R/ti/p/@${basicId}`
-    : '#';
-
   getApp().innerHTML = `
     <div class="card">
       <div class="queue-icon">🏥</div>
@@ -95,9 +91,9 @@ function renderFriendAdd(): void {
         <p class="name">${escapeHtml(profile.displayName)} さん</p>
       </div>
       <p class="message">受付には友だち追加が必要です</p>
-      <a href="${friendAddUrl}" class="queue-checkin-btn" style="display:block;text-align:center;text-decoration:none;color:#fff;">
+      <button class="queue-checkin-btn" data-action="add-friend">
         友だち追加して受付する
-      </a>
+      </button>
       <p class="message" style="font-size:12px;color:#999;margin-top:12px;">
         追加後、この画面に戻ってください
       </p>
@@ -106,6 +102,26 @@ function renderFriendAdd(): void {
       </button>
     </div>
   `;
+
+  // Friend-add button — use location.href for reliable navigation inside LIFF
+  getApp().querySelector('[data-action="add-friend"]')?.addEventListener('click', () => {
+    if (basicId) {
+      // Try multiple URL formats for maximum compatibility inside LINE
+      const url = `https://line.me/R/ti/p/@${basicId}`;
+      if (liff.isInClient()) {
+        // Inside LINE app: use location to navigate
+        window.location.href = url;
+      } else {
+        // External browser: open in new tab
+        window.open(url, '_blank');
+      }
+    } else {
+      // Fallback: tell user to search for the account
+      alert(accountName
+        ? `LINEで「${accountName}」を検索して友だち追加してください`
+        : 'LINEの公式アカウントを友だち追加してください');
+    }
+  });
 
   // Re-check button
   getApp().querySelector('[data-action="recheck"]')?.addEventListener('click', () => {
