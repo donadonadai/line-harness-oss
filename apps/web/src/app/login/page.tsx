@@ -96,9 +96,9 @@ export default function LoginPage() {
       <div className="bg-white rounded-2xl shadow-xl p-8 w-full max-w-sm">
         <div className="text-center mb-6">
           <div className="w-12 h-12 rounded-xl flex items-center justify-center text-white font-bold text-lg mx-auto mb-3" style={{ backgroundColor: '#06C755' }}>
-            H
+            Y
           </div>
-          <h1 className="text-xl font-bold text-gray-900">LINE Harness</h1>
+          <h1 className="text-xl font-bold text-gray-900">YOSHIDA LINE</h1>
           <p className="text-sm text-gray-500 mt-1">
             {mode === 'setup' ? '初期セットアップ' : '管理画面にログイン'}
           </p>

@@ -181,7 +181,7 @@ h1{font-size:28px;font-weight:800;color:#1a1a1a;margin-bottom:8px}
 <div class="step"><div class="step-num">3</div><div class="step-text">「受付する」ボタンをタップ</div></div>
 <div class="step"><div class="step-num">4</div><div class="step-text">準備ができたらLINEでお知らせ</div></div>
 </div>
-<p class="footer">LINE Harness 受付システム</p>
+<p class="footer">YOSHIDA LINE 受付システム</p>
 </div>
 </body>
 </html>`)
