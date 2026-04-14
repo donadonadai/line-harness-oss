@@ -1,6 +1,6 @@
 import { Hono } from 'hono';
-import { getTags, createTag, deleteTag } from '@line-crm/db';
-import type { Tag as DbTag } from '@line-crm/db';
+import { getTags, createTag, updateTag, deleteTag, getTagsWithCount } from '@line-crm/db';
+import type { Tag as DbTag, TagWithCount as DbTagWithCount } from '@line-crm/db';
 import type { Env } from '../index.js';
 
 const tags = new Hono<Env>();
@@ -14,9 +14,24 @@ function serializeTag(row: DbTag) {
   };
 }
 
+function serializeTagWithCount(row: DbTagWithCount) {
+  return {
+    id: row.id,
+    name: row.name,
+    color: row.color,
+    createdAt: row.created_at,
+    friendCount: row.friend_count,
+  };
+}
+
 // GET /api/tags - list all tags
 tags.get('/api/tags', async (c) => {
   try {
+    const withCount = c.req.query('withCount');
+    if (withCount === '1' || withCount === 'true') {
+      const items = await getTagsWithCount(c.env.DB);
+      return c.json({ success: true, data: items.map(serializeTagWithCount) });
+    }
     const items = await getTags(c.env.DB);
     return c.json({ success: true, data: items.map(serializeTag) });
   } catch (err) {
@@ -42,6 +57,24 @@ tags.post('/api/tags', async (c) => {
     return c.json({ success: true, data: serializeTag(tag) }, 201);
   } catch (err) {
     console.error('POST /api/tags error:', err);
+    return c.json({ success: false, error: 'Internal server error' }, 500);
+  }
+});
+
+// PUT /api/tags/:id - update tag
+tags.put('/api/tags/:id', async (c) => {
+  try {
+    const id = c.req.param('id');
+    const body = await c.req.json<{ name?: string; color?: string }>();
+
+    const tag = await updateTag(c.env.DB, id, body);
+    if (!tag) {
+      return c.json({ success: false, error: 'Tag not found' }, 404);
+    }
+
+    return c.json({ success: true, data: serializeTag(tag) });
+  } catch (err) {
+    console.error('PUT /api/tags/:id error:', err);
     return c.json({ success: false, error: 'Internal server error' }, 500);
   }
 });
