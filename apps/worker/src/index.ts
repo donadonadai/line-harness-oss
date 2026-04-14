@@ -34,6 +34,7 @@ import { trackedLinks } from './routes/tracked-links.js';
 import { forms } from './routes/forms.js';
 import { queue } from './routes/queue.js';
 import { customFields } from './routes/custom-fields.js';
+import { staff } from './routes/staff.js';
 
 export type Env = {
   Bindings: {
@@ -86,6 +87,7 @@ app.route('/', trackedLinks);
 app.route('/', forms);
 app.route('/', queue);
 app.route('/', customFields);
+app.route('/', staff);
 
 // Short link: /r/:ref → landing page with LINE open button
 app.get('/r/:ref', (c) => {

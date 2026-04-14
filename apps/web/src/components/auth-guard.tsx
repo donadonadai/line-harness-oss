@@ -13,8 +13,10 @@ export default function AuthGuard({ children }: { children: React.ReactNode }) {
       return
     }
 
-    const key = localStorage.getItem('lh_api_key')
-    if (!key) {
+    // Check for JWT token or legacy API key
+    const token = localStorage.getItem('lh_token')
+    const legacyKey = localStorage.getItem('lh_api_key')
+    if (!token && !legacyKey) {
       router.replace('/login')
     } else {
       setChecked(true)

@@ -653,3 +653,21 @@ CREATE TABLE IF NOT EXISTS friend_custom_fields (
 );
 CREATE UNIQUE INDEX IF NOT EXISTS idx_fcf_friend_key ON friend_custom_fields (friend_id, field_key);
 CREATE INDEX IF NOT EXISTS idx_fcf_friend ON friend_custom_fields (friend_id);
+
+-- ─────────────────────────────────────────────────────────────
+-- Round 8: スタッフ管理 (Staff Authentication)
+-- ─────────────────────────────────────────────────────────────
+
+CREATE TABLE IF NOT EXISTS staff (
+  id              TEXT PRIMARY KEY,
+  login_id        TEXT NOT NULL UNIQUE,
+  password_hash   TEXT NOT NULL,
+  password_salt   TEXT NOT NULL,
+  name            TEXT NOT NULL,
+  role            TEXT NOT NULL DEFAULT 'staff' CHECK (role IN ('admin', 'staff')),
+  is_active       INTEGER NOT NULL DEFAULT 1,
+  line_account_id TEXT,
+  created_at      TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%f', 'now', '+9 hours')),
+  updated_at      TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%f', 'now', '+9 hours'))
+);
+CREATE UNIQUE INDEX IF NOT EXISTS idx_staff_login_id ON staff (login_id);

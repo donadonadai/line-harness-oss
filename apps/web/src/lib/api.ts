@@ -38,15 +38,28 @@ export type ApiBroadcast = Broadcast
 const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8787'
 
 /**
- * Read the API key from localStorage first (set during login), falling back to
- * the build-time env var for local development without the login page.
+ * Read the auth token from localStorage first (JWT from staff login),
+ * falling back to legacy API key for backwards compatibility.
  */
 function getApiKey(): string {
   if (typeof window !== 'undefined') {
-    const stored = localStorage.getItem('lh_api_key')
-    if (stored) return stored
+    const token = localStorage.getItem('lh_token')
+    if (token) return token
+    // Legacy fallback
+    const legacyKey = localStorage.getItem('lh_api_key')
+    if (legacyKey) return legacyKey
   }
   return process.env.NEXT_PUBLIC_API_KEY || ''
+}
+
+export type StaffMember = {
+  id: string
+  loginId: string
+  name: string
+  role: 'admin' | 'staff'
+  isActive: boolean
+  lineAccountId: string | null
+  createdAt: string
 }
 
 export async function fetchApi<T>(path: string, options?: RequestInit): Promise<T> {
@@ -611,6 +624,42 @@ export const api = {
         method: 'PUT',
         body: JSON.stringify({ status }),
       }),
+  },
+  auth: {
+    login: (loginId: string, password: string) =>
+      fetchApi<ApiResponse<{ token: string; staff: { id: string; loginId: string; name: string; role: string } }>>('/api/auth/login', {
+        method: 'POST',
+        body: JSON.stringify({ loginId, password }),
+      }),
+    me: () =>
+      fetchApi<ApiResponse<{ id: string; loginId: string; name: string; role: string; lineAccountId: string | null }>>('/api/auth/me'),
+    check: () =>
+      fetchApi<ApiResponse<{ staffExists: boolean }>>('/api/auth/check'),
+    setup: (data: { loginId: string; password: string; name: string }, apiKey: string) =>
+      fetch(`${API_URL}/api/auth/setup`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${apiKey}`,
+        },
+        body: JSON.stringify(data),
+      }).then(r => r.json()) as Promise<ApiResponse<{ id: string; loginId: string; name: string; role: string }>>,
+  },
+  staff: {
+    list: () =>
+      fetchApi<ApiResponse<StaffMember[]>>('/api/staff'),
+    create: (data: { loginId: string; password: string; name: string; role?: 'admin' | 'staff'; lineAccountId?: string }) =>
+      fetchApi<ApiResponse<StaffMember>>('/api/staff', {
+        method: 'POST',
+        body: JSON.stringify(data),
+      }),
+    update: (id: string, data: { name?: string; role?: 'admin' | 'staff'; password?: string; isActive?: boolean; lineAccountId?: string | null }) =>
+      fetchApi<ApiResponse<StaffMember>>(`/api/staff/${id}`, {
+        method: 'PUT',
+        body: JSON.stringify(data),
+      }),
+    delete: (id: string) =>
+      fetchApi<ApiResponse<null>>(`/api/staff/${id}`, { method: 'DELETE' }),
   },
   queue: {
     getSettings: (accountId: string) =>

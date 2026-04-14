@@ -1,5 +1,6 @@
 import type { Context, Next } from 'hono';
 import type { Env } from '../index.js';
+import { verifyJwt } from '../services/jwt.js';
 
 export async function authMiddleware(c: Context<Env>, next: Next): Promise<Response | void> {
   // Skip auth for the LINE webhook endpoint — it uses signature verification instead
@@ -20,7 +21,10 @@ export async function authMiddleware(c: Context<Env>, next: Next): Promise<Respo
     path.match(/^\/api\/forms\/[^/]+$/) || // GET form definition (public for LIFF)
     path === '/api/queue/checkin' || // LIFF queue check-in (public)
     path === '/api/queue/account-info' || // LIFF queue account info (public)
-    path === '/api/prescriptions/submit' // LIFF prescription submission (public)
+    path === '/api/prescriptions/submit' || // LIFF prescription submission (public)
+    path === '/api/auth/login' || // Staff login (public)
+    path === '/api/auth/setup' || // Initial admin setup (validates API_KEY internally)
+    path === '/api/auth/check' // Check if setup is needed (public)
   ) {
     return next();
   }
@@ -31,9 +35,17 @@ export async function authMiddleware(c: Context<Env>, next: Next): Promise<Respo
   }
 
   const token = authHeader.slice('Bearer '.length);
-  if (token !== c.env.API_KEY) {
-    return c.json({ success: false, error: 'Unauthorized' }, 401);
+
+  // Try JWT token first
+  const jwtPayload = await verifyJwt(token, c.env.API_KEY);
+  if (jwtPayload) {
+    return next();
   }
 
-  return next();
+  // Fallback: legacy API_KEY for backwards compatibility
+  if (token === c.env.API_KEY) {
+    return next();
+  }
+
+  return c.json({ success: false, error: 'Unauthorized' }, 401);
 }
